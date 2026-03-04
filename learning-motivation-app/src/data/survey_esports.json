@@ -1,0 +1,102 @@
+[
+  {
+    "id": 1,
+    "text": "孩子在面对游戏中的高压对抗局面时，情绪控制能力如何？",
+    "options": [
+      { "id": "A", "text": "极其冷静，专注于战术调整", "type": "talent_high" },
+      { "id": "B", "text": "偶尔急躁，但能很快平复", "type": "talent_medium" },
+      { "id": "C", "text": "容易崩溃，大喊大叫或摔打设备", "type": "risk_high" },
+      { "id": "D", "text": "完全放弃，消极应对", "type": "risk_medium" }
+    ]
+  },
+  {
+    "id": 2,
+    "text": "当游戏失败或连跪时，孩子的通常反应是？",
+    "options": [
+      { "id": "A", "text": "观看回放，分析失误原因", "type": "talent_high" },
+      { "id": "B", "text": "稍作休息，调整状态再战", "type": "talent_medium" },
+      { "id": "C", "text": "立即开始下一局，带有报复心理", "type": "addiction_high" },
+      { "id": "D", "text": "迁怒于队友或网络", "type": "risk_high" }
+    ]
+  },
+  {
+    "id": 3,
+    "text": "孩子每天的游戏时长通常是多少？",
+    "options": [
+      { "id": "A", "text": "严格控制在约定时间内", "type": "control_good" },
+      { "id": "B", "text": "偶尔超时，但经提醒能下线", "type": "control_medium" },
+      { "id": "C", "text": "经常超时，且很难叫停", "type": "addiction_medium" },
+      { "id": "D", "text": "几乎整天都在玩，严重影响作息", "type": "addiction_severe" }
+    ]
+  },
+  {
+    "id": 4,
+    "text": "除了游戏，孩子是否还有其他兴趣爱好或社交活动？",
+    "options": [
+      { "id": "A", "text": "有，且积极参与", "type": "balance_good" },
+      { "id": "B", "text": "有，但兴趣不如游戏大", "type": "balance_medium" },
+      { "id": "C", "text": "几乎没有，只对游戏感兴趣", "type": "risk_isolation" },
+      { "id": "D", "text": "曾经有，现在完全放弃了", "type": "risk_deterioration" }
+    ]
+  },
+  {
+    "id": 5,
+    "text": "孩子在游戏中的团队协作能力如何？",
+    "options": [
+      { "id": "A", "text": "善于沟通，能指挥或配合队友", "type": "talent_team" },
+      { "id": "B", "text": "能进行基本交流，不拖后腿", "type": "talent_avg" },
+      { "id": "C", "text": "喜欢独来独往，不顾队友", "type": "risk_solo" },
+      { "id": "D", "text": "经常与队友发生言语冲突", "type": "risk_toxic" }
+    ]
+  },
+  {
+    "id": 6,
+    "text": "孩子的手眼协调反应速度（比如接住掉落的物品）如何？",
+    "options": [
+      { "id": "A", "text": "极快，经常让人惊讶", "type": "talent_reflex" },
+      { "id": "B", "text": "比同龄人稍快", "type": "talent_avg" },
+      { "id": "C", "text": "普通水平", "type": "normal" },
+      { "id": "D", "text": "显得有些笨拙", "type": "weakness" }
+    ]
+  },
+  {
+    "id": 7,
+    "text": "对于新发布的游戏或新版本，孩子的适应速度？",
+    "options": [
+      { "id": "A", "text": "上手极快，迅速掌握核心机制", "type": "talent_learning" },
+      { "id": "B", "text": "需要一段时间摸索，但能学会", "type": "normal" },
+      { "id": "C", "text": "比较吃力，喜欢玩老游戏", "type": "risk_stagnation" },
+      { "id": "D", "text": "完全不感兴趣，只重复机械操作", "type": "risk_mindless" }
+    ]
+  },
+  {
+    "id": 8,
+    "text": "如果禁止孩子玩游戏一周，他的反应会是？",
+    "options": [
+      { "id": "A", "text": "寻找替代娱乐，情绪稳定", "type": "not_addicted" },
+      { "id": "B", "text": "有些失落，但能接受", "type": "mild_dependence" },
+      { "id": "C", "text": "情绪极度低落，甚至绝食/抗议", "type": "severe_dependence" },
+      { "id": "D", "text": "出现暴力倾向或自残行为", "type": "dangerous" }
+    ]
+  },
+  {
+    "id": 9,
+    "text": "孩子是否因为游戏影响了身体健康（如视力下降、颈椎痛）？",
+    "options": [
+      { "id": "A", "text": "身体非常健康，有运动习惯", "type": "healthy" },
+      { "id": "B", "text": "偶有疲劳，休息后能恢复", "type": "minor_issue" },
+      { "id": "C", "text": "经常抱怨身体不适", "type": "health_warning" },
+      { "id": "D", "text": "已确诊相关疾病或明显体质下降", "type": "health_crisis" }
+    ]
+  },
+  {
+    "id": 10,
+    "text": "作为家长，您对孩子未来从事电竞行业的态度？",
+    "options": [
+      { "id": "A", "text": "如果真有天赋，全力支持", "type": "supportive" },
+      { "id": "B", "text": "保持观望，不反对也不鼓励", "type": "neutral" },
+      { "id": "C", "text": "坚决反对，认为是不务正业", "type": "opposed" },
+      { "id": "D", "text": "感到迷茫，不知道该怎么办", "type": "confused" }
+    ]
+  }
+]
