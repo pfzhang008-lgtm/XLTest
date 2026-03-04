@@ -1,0 +1,176 @@
+{
+  "pages": [
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "学习动力中心",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/onboarding/calibration",
+      "style": {
+        "navigationBarTitleText": "基础档案标定",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/phone-addiction/index",
+      "style": {
+        "navigationBarTitleText": "电竞天赋评估",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/phone-addiction/parent-survey",
+      "style": {
+        "navigationBarTitleText": "家长观察问卷",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/history/index",
+      "style": {
+        "navigationBarTitleText": "历史档案",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/intervention/index",
+      "style": {
+        "navigationBarTitleText": "专家干预",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/test1",
+      "style": {
+        "navigationBarTitleText": "神经链路测试",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/test1-result",
+      "style": {
+        "navigationBarTitleText": "测试结果",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/test2",
+      "style": {
+        "navigationBarTitleText": "视觉专注测试",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/test2-result",
+      "style": {
+        "navigationBarTitleText": "认知钝化诊断报告",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/test3",
+      "style": {
+        "navigationBarTitleText": "干扰耐受度测试",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/test3-result",
+      "style": {
+        "navigationBarTitleText": "大脑年龄诊断",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/nback",
+      "style": {
+        "navigationBarTitleText": "记忆锚点追踪",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/nback-result",
+      "style": {
+        "navigationBarTitleText": "N-Back 深度扫描报告",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/sart",
+      "style": {
+        "navigationBarTitleText": "雷达哨兵测试",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/sart-result",
+      "style": {
+        "navigationBarTitleText": "SART 诊断报告",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/exam-anxiety/ExamAnxiety",
+      "style": {
+        "navigationBarTitleText": "考前焦虑心魔扫描",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/video_fog/index",
+      "style": {
+        "navigationBarTitleText": "短视频脑雾检测",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/academic_focus/index",
+      "style": {
+        "navigationBarTitleText": "学业专注力体检",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/study_mindset/index",
+      "style": {
+        "navigationBarTitleText": "学习心态扫描",
+        "navigationStyle": "custom"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "学习动力中心",
+    "navigationBarBackgroundColor": "#05070A",
+    "backgroundColor": "#05070A"
+  },
+  "tabBar": {
+    "color": "#64748b",
+    "selectedColor": "#00FFFF",
+    "backgroundColor": "#000000",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "static/transparent.png",
+        "selectedIconPath": "static/transparent.png"
+      },
+      {
+        "pagePath": "pages/history/index",
+        "text": "档案",
+        "iconPath": "static/transparent.png",
+        "selectedIconPath": "static/transparent.png"
+      },
+      {
+        "pagePath": "pages/intervention/index",
+        "text": "设置",
+        "iconPath": "static/transparent.png",
+        "selectedIconPath": "static/transparent.png"
+      }
+    ]
+  }
+}
