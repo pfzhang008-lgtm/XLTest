@@ -16,7 +16,7 @@
         <view class="card-body">
           <view class="title-row">
             <image class="title-icon" :src="icons.neurology" mode="aspectFit" ></image>
-            <text class="card-title">视动神经传导测评</text>
+            <text class="card-title">PVT 视动反应测试</text>
             <view class="outline-badge cyan-border">
               <text class="outline-badge-text cyan-text">竞技/反应</text>
             </view>
@@ -45,7 +45,7 @@
         <view class="card-body">
           <view class="title-row">
             <image class="title-icon" :src="icons.mindfulness" mode="aspectFit"  ></image>
-            <text class="card-title">干扰耐受度测试</text>
+            <text class="card-title">Stroop 冲突抑制测验</text>
             <view class="outline-badge emerald-border">
               <text class="outline-badge-text emerald-text">抗干扰/自控</text>
             </view>
@@ -167,11 +167,11 @@ export default {
     startTest(type) {
       console.log(`[Interaction] 用户点击了启动测试: ${type}`);
       
-      let url = '/pages/neural-link/test1';
+      let url = '/pages/neural-link/PVT';
       if (type === 'ParentSurvey') {
         url = '/pages/phone-addiction/parent-survey';
       } else if (type === 'ShortVideo') {
-        url = '/pages/neural-link/nback';
+        url = '/pages/neural-link/Stroop';
       }
       
       // 跳转到对应测试页

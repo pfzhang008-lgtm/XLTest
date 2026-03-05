@@ -78,7 +78,7 @@
             </text>
           </view>
           
-          <button class="tech-button purple-btn" hover-class="tech-btn-hover" @click="showDevToast">
+          <button class="tech-button purple-btn" hover-class="tech-btn-hover" @click="navigateTo('/pages/survey/index?type=academic')">
             <view class="btn-glow"></view>
             <text class="btn-text purple-text">填写量表</text>
             <image class="btn-icon" :src="icons.analytics" mode="aspectFit"></image>
@@ -89,11 +89,18 @@
       <!-- Footer Spacer -->
       <view class="footer-spacer"></view>
     </scroll-view>
+    <!-- Custom Tab Bar -->
+    <app-tab-bar current-tab="home"></app-tab-bar>
   </view>
 </template>
 
 <script>
+import AppTabBar from '@/components/AppTabBar.vue';
+
 export default {
+  components: {
+    AppTabBar
+  },
   data() {
     return {
       statusBarHeight: 20,
@@ -130,9 +137,11 @@ export default {
   },
   methods: {
     goBack() {
+      console.log('[AcademicFocus] User clicked back button');
       uni.navigateBack();
     },
     navigateTo(url) {
+      console.log('[AcademicFocus] User navigating to:', url);
       uni.navigateTo({ url });
     },
     showDevToast() {

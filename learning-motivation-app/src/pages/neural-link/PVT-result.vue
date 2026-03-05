@@ -19,7 +19,7 @@
         <view class="brain-visual" :style="{ borderColor: diagnosis.color, boxShadow: '0 0 60rpx ' + diagnosis.color + '33' }">
           <image 
             class="brain-image" 
-            src="/static/brain-viz.png" 
+            src="/static/brain-viz.svg" 
             mode="aspectFill"
           ></image>
           <view class="overlay-gradient" :style="{ background: 'linear-gradient(to top, ' + diagnosis.color + '99, transparent)' }"></view>
@@ -274,8 +274,9 @@ export default {
       uni.reLaunch({ url: '/pages/index/index' });
     },
     restartTest() {
-      console.log('User clicked Restart Test button');
-      uni.redirectTo({ url: '/pages/neural-link/test1' });
+      uni.redirectTo({
+        url: '/pages/neural-link/PVT'
+      });
     }
   },
   onLoad(options) {

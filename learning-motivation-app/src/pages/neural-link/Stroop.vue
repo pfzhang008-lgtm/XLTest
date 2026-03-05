@@ -94,13 +94,25 @@
         ></view>
       </view>
     </view>
+    
+    <!-- Countdown Overlay -->
+    <CountdownOverlay 
+      v-if="showCountdown" 
+      @complete="handleCountdownComplete" 
+    />
   </view>
 </template>
 
 <script>
+import CountdownOverlay from '@/components/CountdownOverlay.vue';
+
 export default {
+  components: {
+    CountdownOverlay
+  },
   data() {
     return {
+      showCountdown: true,
       statusBarHeight: 20,
       menuButtonTop: 24, // Default
       menuButtonHeight: 32, // Default
@@ -182,7 +194,7 @@ export default {
     this.navPaddingBottom = 4;
     // #endif
 
-    this.startGame();
+    // this.startGame(); // Moved to handleCountdownComplete
   },
   onUnload() {
     this.stopTimer();
@@ -190,6 +202,10 @@ export default {
   methods: {
     goBack() {
       uni.navigateBack();
+    },
+    handleCountdownComplete() {
+      this.showCountdown = false;
+      this.startGame();
     },
     startGame() {
       this.currentRound = 1;
@@ -317,7 +333,7 @@ export default {
       
       // Navigate to Result
       uni.redirectTo({
-        url: `/pages/neural-link/test3-result?score=${this.score}&errors=${this.errors}&avgTime=${Math.round(avgReaction)}&totalTime=${totalTime}`
+        url: `/pages/neural-link/Stroop-result?score=${this.score}&errors=${this.errors}&avgTime=${Math.round(avgReaction)}&totalTime=${totalTime}`
       });
     }
   }

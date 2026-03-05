@@ -1,27 +1,20 @@
 <template>
   <view class="container">
     <!-- Header -->
-    <view class="header" :style="{ paddingTop: (statusBarHeight + 10) + 'px' }">
-      <view class="back-btn" @click="goBack">
-        <text class="back-arrow">←</text>
+    <view class="header" :style="{ paddingTop: menuButtonTop + 'px', paddingBottom: navPaddingBottom + 'px' }">
+      <view class="header-content" :style="{ height: menuButtonHeight + 'px' }">
+        <view class="back-btn" @click="goBack">
+          <text class="back-arrow">←</text>
+        </view>
+        <text class="page-title">舒尔特方格</text>
       </view>
     </view>
 
     <!-- Timer Section -->
     <view class="timer-section">
-      <view class="timer-block">
-        <text class="timer-value">{{ formatTime(minutes) }}</text>
-        <text class="timer-label">分</text>
-      </view>
-      <text class="timer-separator">:</text>
-      <view class="timer-block highlight-block" @click="finishTest">
-        <text class="timer-value highlight-cyan">{{ formatTime(seconds) }}</text>
-        <text class="timer-label highlight-cyan">秒</text>
-      </view>
-      <text class="timer-separator">.</text>
-      <view class="timer-block">
-        <text class="timer-value">{{ formatMs(milliseconds) }}</text>
-        <text class="timer-label">毫秒</text>
+      <view class="timer-display">
+        <text class="timer-main">{{ formatTime(minutes) }}:{{ formatTime(seconds) }}</text>
+        <text class="timer-ms">.{{ formatMs(milliseconds) }}</text>
       </view>
     </view>
 
@@ -92,6 +85,9 @@ export default {
       timerInterval: null,
       effectInterval: null,
       statusBarHeight: 20,
+      menuButtonTop: 24,
+      menuButtonHeight: 32,
+      navPaddingBottom: 8,
       minutes: 0,
       seconds: 0,
       milliseconds: 0,
@@ -113,6 +109,20 @@ export default {
     }
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
+
+    // #ifdef MP-WEIXIN
+    const menuButton = uni.getMenuButtonBoundingClientRect();
+    this.menuButtonTop = menuButton.top;
+    this.menuButtonHeight = menuButton.height;
+    this.navPaddingBottom = menuButton.top - this.statusBarHeight;
+    if (this.navPaddingBottom < 4) this.navPaddingBottom = 4;
+    // #endif
+    // #ifndef MP-WEIXIN
+    this.menuButtonTop = this.statusBarHeight + 4;
+    this.menuButtonHeight = 32;
+    this.navPaddingBottom = 4;
+    // #endif
+
     this.initGrid();
     this.startTimer();
     this.startRandomEffects();
@@ -135,6 +145,7 @@ export default {
       return 20 + Math.random() * 40;
     },
     initGrid() {
+      console.log('Schulte Grid: Initializing grid with 25 numbers');
       let numbers = Array.from({ length: 25 }, (_, i) => i + 1);
       // Fisher-Yates Shuffle
       for (let i = numbers.length - 1; i > 0; i--) {
@@ -157,8 +168,10 @@ export default {
       this.focusSegments = [];
       this.currentFocusBlock = 0;
       this.lastClickTimestamp = Date.now();
+      console.log('Schulte Grid: Grid initialized, waiting for input');
     },
     startTimer() {
+      console.log('Schulte Grid: Timer starting...');
       this.startTime = Date.now();
       this.timerInterval = setInterval(() => {
         const diff = Date.now() - this.startTime;
@@ -222,9 +235,11 @@ export default {
     handleCellClick(index) {
       const cell = this.gridData[index];
       const now = Date.now();
+      console.log(`Schulte Grid: Cell clicked - Value: ${cell.value}, Expected: ${this.expectedNumber}`);
       
       if (cell.value === this.expectedNumber) {
         // Correct click
+        console.log('Schulte Grid: Correct input');
         const interval = now - this.lastClickTimestamp;
         
         if (interval < this.FOCUS_THRESHOLD) {
@@ -278,6 +293,7 @@ export default {
       }
     },
     finishTest() {
+      console.log('Schulte Grid: Test finished, navigating to results');
       this.clearTimers();
       const timeStr = `${this.minutes}:${this.seconds}.${this.milliseconds}`;
       const totalDuration = (Date.now() - this.startTime) / 1000; // seconds
@@ -288,6 +304,8 @@ export default {
         const sum = this.focusSegments.reduce((a, b) => a + b, 0);
         avgFocus = Math.round(sum / this.focusSegments.length);
       }
+      
+      console.log(`Schulte Grid: Results - Errors: ${this.errorCount}, AvgFocus: ${avgFocus}ms, Duration: ${totalDuration}s`);
       
       uni.navigateTo({
         url: `/pages/neural-link/test2-result?errorCount=${this.errorCount}&avgFocus=${avgFocus}&totalDuration=${totalDuration}&mode=${this.mode}`
@@ -319,10 +337,22 @@ page {
 
 /* Header */
 .header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  background-color: rgba(5, 5, 5, 0.8);
+  backdrop-filter: blur(10px);
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  box-sizing: border-box;
+}
+
+.header-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 24rpx;
+  position: relative;
 }
 
 .back-btn {
@@ -334,7 +364,12 @@ page {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
-  margin-left: 0;
+  transition: all 0.2s;
+}
+
+.back-btn:active {
+  transform: scale(0.9);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .back-arrow {
@@ -342,111 +377,47 @@ page {
   font-size: 40rpx;
   font-weight: bold;
   line-height: 1;
-}
-
-.icon-svg {
-  width: 48rpx;
-  height: 48rpx;
-}
-
-.title-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  margin-bottom: 4rpx;
 }
 
 .page-title {
-  font-size: 34rpx;
-  font-weight: bold;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 32rpx;
+  font-weight: 600;
   color: white;
-  margin-bottom: 8rpx;
-}
-
-.recording-status {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.status-dot-green {
-  width: 12rpx;
-  height: 12rpx;
-  background-color: #4ade80; /* green-400 */
-  border-radius: 50%;
-  box-shadow: 0 0 8rpx #4ade80;
-  animation: blink 2s infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.status-text {
-  font-size: 20rpx;
-  color: #6b7280; /* gray-500 */
-}
-
-.abort-btn {
-  padding: 8rpx 24rpx;
-  border: 1px solid rgba(239, 68, 68, 0.5); /* red-500/50 */
-  border-radius: 8rpx;
-  background-color: rgba(239, 68, 68, 0.1);
-}
-
-.abort-text {
-  font-size: 24rpx;
-  color: #ef4444; /* red-500 */
+  letter-spacing: 2rpx;
+  margin-bottom: 0;
 }
 
 /* Timer Section */
 .timer-section {
+  margin-top: 200rpx; /* Space for fixed header */
+  margin-bottom: 40rpx;
   display: flex;
   justify-content: center;
-  align-items: center;
-  gap: 16rpx;
-  margin-top: 32rpx;
-  margin-bottom: 48rpx;
-  padding: 0 16rpx;
 }
 
-.timer-block {
+.timer-display {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  background-color: #111;
-  border: 1px solid #333;
-  border-radius: 16rpx;
-  padding: 24rpx 32rpx;
-  min-width: 120rpx;
+  align-items: baseline;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
 }
 
-.highlight-block {
-  border-color: rgba(6, 182, 212, 0.5); /* cyan-500/50 */
-  box-shadow: 0 0 20rpx rgba(6, 182, 212, 0.1);
-}
-
-.timer-value {
-  font-size: 48rpx;
+.timer-main {
+  font-size: 80rpx;
   font-weight: bold;
-  color: white;
-  font-family: monospace;
+  color: #fff;
+  text-shadow: 0 0 20rpx rgba(6, 182, 212, 0.5);
+  letter-spacing: 4rpx;
 }
 
-.highlight-cyan {
-  color: #06b6d4; /* cyan-500 */
-}
-
-.timer-label {
-  font-size: 20rpx;
-  color: #6b7280;
-  margin-top: 8rpx;
-}
-
-.timer-separator {
+.timer-ms {
   font-size: 40rpx;
-  color: #4b5563;
-  margin-top: -30rpx;
+  font-weight: normal;
+  color: #06b6d4; /* cyan-500 */
+  margin-left: 4rpx;
 }
 
 /* Progress Section */
@@ -502,15 +473,19 @@ page {
 .grid-container {
   display: flex;
   justify-content: center;
+  padding: 0 32rpx;
   margin-bottom: 48rpx;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .schulte-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   grid-template-rows: repeat(5, 1fr);
-  gap: 12rpx;
+  gap: 16rpx;
   width: 100%;
+  max-width: 686rpx;
   aspect-ratio: 1;
 }
 

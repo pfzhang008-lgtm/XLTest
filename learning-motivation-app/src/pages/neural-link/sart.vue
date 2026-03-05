@@ -7,7 +7,7 @@
     <!-- Glitch Overlay -->
     <view v-if="feedback === 'false-alarm'" class="glitch-overlay">
       <text class="glitch-text" data-text="SYSTEM OVERRIDE">SYSTEM OVERRIDE</text>
-      <text class="glitch-sub">禁止操作盟友信号</text>
+      <text class="glitch-sub">禁止操作信号</text>
     </view>
 
     <!-- Header -->
@@ -15,13 +15,6 @@
       <view class="header-top">
         <view class="back-btn" @click="goBack">
           <text class="back-arrow">←</text>
-        </view>
-        <view class="status-icon">
-          <view class="radar-ping"></view>
-        </view>
-        <view class="header-info">
-          <text class="header-title">系统扫描中</text>
-          <text class="header-sub">LIVE FEED // SART-01</text>
         </view>
         <view class="exit-btn" @click="quitTest">
           <text>终止</text>
@@ -57,33 +50,22 @@
       <!-- Stimulus Display Area -->
       <view class="stimulus-container">
         <transition name="scale-fade">
-          <view v-if="isVisible && currentStimulus" class="stimulus-icon-wrapper" :class="currentStimulus">
-            <!-- Threat Icon (Red Triangle) -->
-            <image v-if="currentStimulus === 'threat'" class="stimulus-img" :src="icons.threat" mode="aspectFit"></image>
-            
-            <!-- Ally Icon (Green Circle) -->
-            <image v-if="currentStimulus === 'ally'" class="stimulus-img" :src="icons.ally" mode="aspectFit"></image>
-            
-            <text class="stimulus-label">
-              {{ currentStimulus === 'threat' ? '威胁目标' : '盟友信号' }}
+          <view v-if="isVisible && currentStimulus !== null" class="stimulus-icon-wrapper">
+            <text class="stimulus-number text-cyan">
+              {{ currentStimulus }}
             </text>
           </view>
         </transition>
       </view>
       
-      <!-- Decor Labels -->
-      <text class="decor-label top">N-12.55</text>
-      <text class="decor-label bottom">S-44.02</text>
-      <text class="decor-label left">W-88</text>
-      <text class="decor-label right">E-09</text>
+
     </view>
 
     <!-- Feedback Indicator (Center Bottom) -->
     <view class="feedback-area">
       <text v-if="feedback === 'hit'" class="feedback-text text-green">目标捕获 [CAPTURED]</text>
       <text v-if="feedback === 'miss'" class="feedback-text text-yellow">目标丢失 [MISSED]</text>
-      <text v-else class="feedback-text placeholder">检测到目标：<text class="highlight-red">A类</text></text>
-      <text class="instruction-text">点击下方扫描区域进行拦截</text>
+      <text v-else class="feedback-text pvt-style-hint">数字不是<text class="text-cyan">3</text>时立即点击⬇️</text>
     </view>
 
     <!-- Interaction Area (Bottom) -->
@@ -105,16 +87,22 @@
         <image class="arrow-icon" :src="icons.chevron_right" mode="aspectFit"></image>
       </view>
     </view>
+
+    <!-- Countdown Overlay -->
+    <CountdownOverlay 
+      v-if="showCountdown" 
+      offset-y="-250rpx"
+      @complete="handleCountdownComplete" 
+    />
   </view>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import CountdownOverlay from '@/components/CountdownOverlay.vue';
 
 // --- Icons (Data URIs) ---
 const icons = {
-  threat: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%23ef4444%22%3E%3Cpath d%3D%22M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z%22%2F%3E%3C%2Fsvg%3E',
-  ally: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%234ade80%22%3E%3Cpath d%3D%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z%22%2F%3E%3C%2Fsvg%3E',
   fingerprint: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%23ef4444%22%3E%3Cpath d%3D%22M17.81 4.47c-.08 0-.16-.02-.23-.06C15.66 3.42 14 3 12.01 3c-1.98 0-3.86.47-5.57 1.41-.24.13-.54.04-.68-.2-.13-.24-.04-.55.2-.68C7.82 2.52 9.86 2 12.01 2c2.13 0 3.99.47 6.03 1.52.25.13.34.43.21.67-.09.18-.26.28-.44.28zM3.5 9.72c-.1 0-.2-.03-.29-.09-.23-.16-.28-.47-.12-.7.99-1.4 2.25-2.5 3.75-3.27C9.98 4.04 14 4.03 17.15 5.65c1.5.77 2.76 1.86 3.75 3.25.16.22.11.54-.12.7-.23.16-.54.11-.7-.12-.9-1.26-2.04-2.25-3.39-2.94-2.87-1.47-6.54-1.47-9.4.01-1.36.7-2.5 1.7-3.4 2.96-.08.14-.23.21-.39.21zm6.25 12.07c-.13 0-.26-.05-.35-.15-.87-.87-1.34-1.43-2.01-2.64-.69-1.23-1.05-2.73-1.05-4.34 0-2.97 2.54-5.39 5.66-5.39s5.66 2.42 5.66 5.39c0 .28-.22.5-.5.5s-.5-.22-.5-.5c0-2.42-2.09-4.39-4.66-4.39-2.57 0-4.66 1.97-4.66 4.39 0 1.44.32 2.77.93 3.85.64 1.15 1.08 1.64 1.85 2.42.19.2.19.51 0 .71-.11.1-.24.15-.37.15zm7.17-1.85c-1.19 0-2.24-.3-3.1-.89-1.49-1.01-2.38-2.65-2.38-4.39 0-.28.22-.5.5-.5s.5.22.5.5c0 1.41.72 2.74 1.94 3.56.71.48 1.54.71 2.54.71.24 0 .64-.03 1.04-.1.27-.05.53.13.58.41.05.27-.13.53-.41.58-.57.11-1.07.12-1.21.12zM14.91 22c-.04 0-.09-.01-.13-.02-1.59-.44-2.63-1.03-3.72-2.1-1.4-1.39-2.17-3.24-2.17-5.22 0-1.62 1.38-2.94 3.08-2.94 1.7 0 3.08 1.32 3.08 2.94 0 1.07.93 1.94 2.08 1.94.17 0 .24-.01.39-.03.27-.05.53.13.58.41.05.27-.13.53-.41.58-.3.05-.66.09-1.14.09-1.7 0-3.08-1.32-3.08-2.94 0-1.07-.93-1.94-2.08-1.94-1.15 0-2.08.87-2.08 1.94 0 1.71.66 3.31 1.87 4.51.95.94 1.86 1.46 3.27 1.85.27.07.42.35.35.61-.05.23-.26.38-.47.38z%22%2F%3E%3C%2Fsvg%3E',
   chevron_right: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%237f1d1d%22%3E%3Cpath d%3D%22M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z%22%2F%3E%3C%2Fsvg%3E'
 };
@@ -124,14 +112,15 @@ const TOTAL_TIME = 90;
 const STIMULUS_DURATION = 800;
 const MIN_ISI = 1200;
 const MAX_ISI = 2500;
-const THREAT_PROBABILITY = 0.85;
+const GO_PROBABILITY = 0.85; // Probability of Non-3 (Go)
 
 // --- State ---
 const timeLeft = ref(TOTAL_TIME);
 const isGameActive = ref(false);
+const showCountdown = ref(true);
 const progressPercentage = computed(() => (timeLeft.value / TOTAL_TIME) * 100);
 
-const currentStimulus = ref(null); // 'threat' | 'ally' | null
+const currentStimulus = ref(null); // number | null
 const isVisible = ref(false);
 const hasActed = ref(false);
 const feedback = ref(null); // 'hit' | 'miss' | 'false-alarm' | null
@@ -153,7 +142,7 @@ let feedbackTimer = null;
 
 // --- Lifecycle ---
 onMounted(() => {
-  startGame();
+  // startGame(); // Moved to handleCountdownComplete
 });
 
 onUnmounted(() => {
@@ -161,6 +150,15 @@ onUnmounted(() => {
 });
 
 // --- Game Logic ---
+const handleCountdownComplete = () => {
+  showCountdown.value = false;
+  startGame();
+};
+
+const goBack = () => {
+  uni.navigateBack();
+};
+
 const startGame = () => {
   resetState();
   isGameActive.value = true;
@@ -204,8 +202,16 @@ const showStimulus = () => {
   if (!isGameActive.value) return;
   
   // Determine Type
-  const isThreat = Math.random() < THREAT_PROBABILITY;
-  currentStimulus.value = isThreat ? 'threat' : 'ally';
+  const isGo = Math.random() < GO_PROBABILITY;
+  
+  if (isGo) {
+    // Non-3 (0-9 excluding 3)
+    const nums = [0, 1, 2, 4, 5, 6, 7, 8, 9];
+    currentStimulus.value = nums[Math.floor(Math.random() * nums.length)];
+  } else {
+    // 3 (No-Go)
+    currentStimulus.value = 3;
+  }
   
   isVisible.value = true;
   hasActed.value = false;
@@ -220,12 +226,12 @@ const showStimulus = () => {
 const hideStimulus = () => {
   isVisible.value = false;
   
-  // Check for Omission (Threat appeared, user did nothing)
-  if (currentStimulus.value === 'threat' && !hasActed.value) {
+  // Check for Omission (Go target appeared, user did nothing)
+  if (currentStimulus.value !== 3 && !hasActed.value) {
     metrics.value.omissions++;
     feedback.value = 'miss'; // Optional: show miss feedback
     clearFeedbackAfterDelay();
-  } else if (currentStimulus.value === 'ally' && !hasActed.value) {
+  } else if (currentStimulus.value === 3 && !hasActed.value) {
     metrics.value.correctRejections++;
   }
   
@@ -240,24 +246,17 @@ const handleTap = () => {
   isPressed.value = true;
   if (!isGameActive.value) return;
   
-  // If tap happens when no stimulus is visible, we generally ignore it in simple SART, 
-  // or count as separate impulsivity. For this spec, only 'Ally' taps are explicitly punished.
-  // But if the user taps LATE (after stimulus hidden), it might be an error. 
-  // For simplicity, we only judge taps while stimulus is visible.
-  
   if (!isVisible.value) return;
   if (hasActed.value) return; // Prevent double taps
   
   hasActed.value = true;
   
-  if (currentStimulus.value === 'threat') {
-    // HIT (Correct)
+  if (currentStimulus.value !== 3) {
+    // HIT (Correct) - Clicked on Non-3
     metrics.value.hits++;
     feedback.value = 'hit';
-    // Subtle positive feedback?
-    // Could add sound here if audio context available
-  } else if (currentStimulus.value === 'ally') {
-    // FALSE ALARM (Impulsivity) - PUNISHMENT
+  } else {
+    // FALSE ALARM (Impulsivity) - Clicked on 3
     metrics.value.falseAlarms++;
     feedback.value = 'false-alarm';
     triggerPunishment();
@@ -519,5 +518,27 @@ const quitTest = () => {
 @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
 @keyframes glitch-skew { 0% { transform: skew(0deg); } 20% { transform: skew(-20deg); } 40% { transform: skew(10deg); } 60% { transform: skew(-5deg); } 80% { transform: skew(5deg); } 100% { transform: skew(0deg); } }
 @keyframes pulse-fast { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.stimulus-number {
+  font-size: 80px;
+  font-weight: bold;
+  font-family: 'Roboto Mono', monospace;
+  text-shadow: 0 0 20px currentColor;
+}
+.text-cyan { color: #00f0ff; }
+.text-red { color: #ef4444; }
+
+.pvt-style-hint {
+  color: #34d399; /* PVT style green (emerald-400) */
+  font-size: 36rpx;
+  font-weight: bold;
+  letter-spacing: 1rpx;
+  animation: pulse-slow 2s infinite;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
 
 </style>

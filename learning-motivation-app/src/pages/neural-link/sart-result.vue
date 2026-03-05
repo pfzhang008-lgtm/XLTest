@@ -1,5 +1,8 @@
 <template>
   <view class="container">
+    <view class="back-btn" @click="goBack">
+      <text class="back-arrow">←</text>
+    </view>
     <!-- Header: Diagnosis Verdict -->
     <view class="header-section fade-in delay-0">
       <view class="header-label">[DIAGNOSTICS COMPLETE]</view>
@@ -182,16 +185,22 @@ const startRehab = () => {
 }
 
 /* Header Section */
-.header-section {
-  margin-bottom: 32px;
-  border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: 24px;
-}
-.header-label {
+  .header-section {
+    position: relative;
+    padding: 60px 20px 30px;
+    background: linear-gradient(180deg, rgba(15, 17, 21, 0.95), rgba(15, 17, 21, 0.8));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+    margin-bottom: 32px;
+  }
+  
+  .header-label {
   font-size: 12px;
-  color: #64748b;
+  color: #00f0ff;
+  letter-spacing: 2px;
   margin-bottom: 8px;
-  letter-spacing: 1px;
+  text-align: center; /* Ensure centered label doesn't overlap back button */
 }
 .verdict-block {
   margin-bottom: 24px;

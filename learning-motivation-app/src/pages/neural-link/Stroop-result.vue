@@ -14,7 +14,7 @@
           <!-- Rust texture overlay using CSS gradients -->
           <view class="rust-overlay"></view>
           <image 
-            src="/static/brain-black.png" 
+            src="/static/brain-black.svg" 
             mode="aspectFit" 
             class="brain-model"
           ></image>
@@ -162,7 +162,7 @@ export default {
       uni.reLaunch({ url: '/pages/index/index' });
     },
     restartTest() {
-      uni.redirectTo({ url: '/pages/neural-link/test3' });
+      uni.redirectTo({ url: '/pages/neural-link/Stroop' });
     }
   }
 };

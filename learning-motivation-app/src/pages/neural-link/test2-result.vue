@@ -188,7 +188,7 @@ export default {
   data() {
     return {
       statusBarHeight: 20,
-      brainImageUrl: '/static/brain-diagnosis.png',
+      brainImageUrl: '/static/brain-diagnosis.svg',
       focusDuration: '< 3',
       errorCount: 12,
       focusLevel: '金鱼级',

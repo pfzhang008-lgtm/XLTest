@@ -21,7 +21,7 @@
       <view class="header-text-container">
         <text class="sub-header">CALIBRATION SEQUENCE</text>
         <view class="main-header-row">
-           <text class="main-header">视动神经传导测试</text>
+           <text class="main-header">PVT 视动反应测试</text>
            <text class="cursor-blink">_</text>
         </view>
       </view>
@@ -103,6 +103,11 @@
     <!-- Decorative Elements -->
     <view class="grid-overlay"></view>
     <view class="scan-line"></view>
+    <CountdownOverlay 
+      v-if="showCountdown" 
+      offset-y="-200rpx"
+      @complete="handleCountdownComplete" 
+    />
   </view>
 </template>
 
@@ -120,7 +125,12 @@
 </script>
 
 <script>
+import CountdownOverlay from '@/components/CountdownOverlay.vue';
+
 export default {
+  components: {
+    CountdownOverlay
+  },
   data() {
     return {
       statusBarHeight: 20,
@@ -131,6 +141,8 @@ export default {
       startTime: 0,
       endTime: 0,
       timer: null,
+      
+      showCountdown: true,
       
       // Test Data
       reactionTimes: [],
@@ -189,13 +201,17 @@ export default {
     // #endif
 
     this.startHardwareMonitor();
-    this.initTest();
+    // this.initTest();
   },
   onUnload() {
     this.stopHardwareMonitor();
     if (this.timer) clearTimeout(this.timer);
   },
   methods: {
+    handleCountdownComplete() {
+      this.showCountdown = false;
+      this.initTest();
+    },
     goBack(e) {
       console.log('[NeuralTest] User clicked Back', e);
       uni.navigateBack();
@@ -362,21 +378,12 @@ export default {
     },
     
     completeTest() {
-      // Navigate to result page with full data
-      // Ensure reactionTimes are valid
-      const validTimes = this.reactionTimes.filter(t => !isNaN(t) && t > 0);
-      const timesStr = validTimes.join(',');
-      
-      // Calculate avg safely
-      let avg = 0;
-      if (validTimes.length > 0) {
-        avg = Math.round(validTimes.reduce((a,b)=>a+b,0) / validTimes.length);
-      }
-      
-      console.log('Test Complete. Stats:', { avg, count: validTimes.length, falseStart: this.falseStartCount });
-      
+      const jsonStr = JSON.stringify({
+        reactionTimes: this.reactionTimes,
+        falseStartCount: this.falseStartCount
+      });
       uni.redirectTo({
-        url: `/pages/neural-link/test1-result?time=${avg}&reactionTimes=${timesStr}&falseStarts=${this.falseStartCount}`
+        url: `/pages/neural-link/PVT-result?data=${encodeURIComponent(jsonStr)}`
       });
     }
   }

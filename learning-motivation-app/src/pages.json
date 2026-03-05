@@ -24,7 +24,14 @@
     {
       "path": "pages/phone-addiction/parent-survey",
       "style": {
-        "navigationBarTitleText": "家长观察问卷",
+        "navigationBarTitleText": "家长观察问卷(新版)",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/survey/index",
+      "style": {
+        "navigationBarTitleText": "临床评估问卷",
         "navigationStyle": "custom"
       }
     },
@@ -43,14 +50,14 @@
       }
     },
     {
-      "path": "pages/neural-link/test1",
+      "path": "pages/neural-link/PVT",
       "style": {
-        "navigationBarTitleText": "神经链路测试",
+        "navigationBarTitleText": "PVT 视动反应测试",
         "navigationStyle": "custom"
       }
     },
     {
-      "path": "pages/neural-link/test1-result",
+      "path": "pages/neural-link/PVT-result",
       "style": {
         "navigationBarTitleText": "测试结果",
         "navigationStyle": "custom"
@@ -71,14 +78,14 @@
       }
     },
     {
-      "path": "pages/neural-link/test3",
+      "path": "pages/neural-link/Stroop",
       "style": {
-        "navigationBarTitleText": "干扰耐受度测试",
+        "navigationBarTitleText": "Stroop 冲突抑制测验",
         "navigationStyle": "custom"
       }
     },
     {
-      "path": "pages/neural-link/test3-result",
+      "path": "pages/neural-link/Stroop-result",
       "style": {
         "navigationBarTitleText": "大脑年龄诊断",
         "navigationStyle": "custom"

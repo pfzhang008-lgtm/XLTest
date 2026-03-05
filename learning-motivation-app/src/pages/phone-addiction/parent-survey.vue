@@ -5,14 +5,14 @@
       <view class="back-btn" @click="goBack">
         <text class="back-arrow">←</text>
       </view>
-      <text class="nav-title">家长观察问卷</text>
+      <text class="nav-title">家长观察问卷 (升级版)</text>
     </view>
 
     <!-- Main Content Area -->
     <view class="content-area">
       
       <!-- Progress Header -->
-      <view v-if="!isLoading" class="progress-header fade-in">
+      <view class="progress-header fade-in">
         <text class="progress-label">[系统诊断中]</text>
         <text class="progress-value">进度: <text class="cyan-text">{{ currentQuestionIndex + 1 }}</text>/{{ totalQuestions }}</text>
         <view class="progress-bar-bg">
@@ -21,11 +21,11 @@
       </view>
 
       <!-- Question Card (Transition Wrapper) -->
-      <view class="card-container" v-if="!isLoading">
+      <view class="card-container">
         <transition name="slide" mode="out-in">
-          <view :key="currentQuestion.id" class="question-card glass-panel">
+          <view :key="currentQuestion.id" class="question-card glass-panel" v-if="currentQuestion.id">
             <view class="question-header">
-              <text class="question-id">Q{{ currentQuestion.id }}</text>
+              <text class="question-id">Q{{ currentQuestionIndex + 1 }}</text>
               <view class="question-decoration"></view>
             </view>
             
@@ -49,22 +49,12 @@
               </view>
             </view>
           </view>
+          <view v-else class="error-state">
+            <text class="error-text">题目加载失败，请检查数据源</text>
+            <text class="debug-info">Total: {{ totalQuestions }}</text>
+          </view>
         </transition>
       </view>
-
-      <!-- Fake Loading Screen -->
-      <view v-else class="loading-screen fade-in">
-        <view class="loading-content">
-          <view class="loader-glitch">
-            <view class="glitch-box"></view>
-            <view class="glitch-box"></view>
-            <view class="glitch-box"></view>
-          </view>
-          <text class="loading-text glitch-text">{{ loadingMessage }}</text>
-          <view class="loading-sub">SYSTEM PROCESSING...</view>
-        </view>
-      </view>
-
     </view>
   </view>
 </template>
@@ -75,23 +65,46 @@ import surveyData from '../../data/survey_esports.json';
 
 // State
 const statusBarHeight = ref(20);
-const questions = ref(surveyData);
+// Extract questions array from the new JSON structure
+const questions = ref([]); 
 const currentQuestionIndex = ref(0);
 const answers = ref({});
-const isLoading = ref(false);
-const loadingMessage = ref('');
 const selectedOptionId = ref(null);
 const isTransitioning = ref(false);
 
 // Computed
 const totalQuestions = computed(() => questions.value.length);
 const currentQuestion = computed(() => questions.value[currentQuestionIndex.value] || {});
-const progressPercent = computed(() => ((currentQuestionIndex.value + 1) / totalQuestions.value) * 100);
+const progressPercent = computed(() => {
+  if (totalQuestions.value === 0) return 0;
+  return ((currentQuestionIndex.value + 1) / totalQuestions.value) * 100;
+});
 
 // Lifecycle
 onMounted(() => {
+  console.log('[ParentSurvey] onMounted started');
   const sysInfo = uni.getSystemInfoSync();
   statusBarHeight.value = sysInfo.statusBarHeight || 20;
+  
+  // Data Loading with detailed logging
+  console.log('[ParentSurvey] Raw surveyData:', surveyData);
+  if (surveyData && surveyData.questions) {
+    questions.value = surveyData.questions;
+    console.log('[ParentSurvey] Questions loaded:', questions.value.length);
+  } else {
+    console.error('[ParentSurvey] Invalid surveyData structure');
+    // Fallback/Mock data if json fails
+    questions.value = [
+      {
+        "id": "q1",
+        "text": "数据加载异常，这是备用题目：孩子是否在无法玩游戏时表现出烦躁？",
+        "options": [
+          { "id": "A", "type": "NORMAL", "text": "从不" },
+          { "id": "B", "type": "PATHOLOGY", "text": "经常" }
+        ]
+      }
+    ];
+  }
 });
 
 // Methods
@@ -101,6 +114,8 @@ const goBack = () => {
 
 const handleSelect = (option) => {
   if (isTransitioning.value) return;
+  
+  console.log('[Interaction] Option selected:', option.id, option.type);
   
   // 1. Visual Feedback
   selectedOptionId.value = option.id;
@@ -120,52 +135,23 @@ const handleSelect = (option) => {
       selectedOptionId.value = null;
       isTransitioning.value = false;
     } else {
-      // Finish -> Loading Screen
-      startFakeLoading();
-    }
-  }, 300); // 300ms delay matches requirement
-};
-
-const startFakeLoading = () => {
-  isLoading.value = true;
-  const messages = [
-    "正在整合多维硬件测算数据...",
-    "正在解析家庭行为观察量表...",
-    "正在执行系统级交叉比对...",
-    "生成临床诊断档案..."
-  ];
-  
-  let msgIndex = 0;
-  loadingMessage.value = messages[0];
-  
-  const interval = setInterval(() => {
-    msgIndex++;
-    if (msgIndex < messages.length) {
-      loadingMessage.value = messages[msgIndex];
-      uni.vibrateShort(); // Haptic tick for effect
-    } else {
-      clearInterval(interval);
+      // Finish immediately
       finishSurvey();
     }
-  }, 1000); // 1s per message
+  }, 300); 
 };
 
 const finishSurvey = () => {
-  // Navigate to Result Page (Mock)
-  // In a real app, you would pass answers via query params or global state
-  // For now, we go back or to a result page if it exists. 
-  // User asked to "emit event or route to ResultPage".
-  // Assuming a generic result page or back for now.
-  
+  console.log('[ParentSurvey] Survey finished. Answers:', answers.value);
   uni.showToast({
-    title: '诊断完成',
+    title: '评估完成',
     icon: 'success',
-    duration: 2000
+    duration: 1500
   });
   
   setTimeout(() => {
     uni.navigateBack();
-  }, 1000);
+  }, 1500);
 };
 </script>
 
@@ -274,20 +260,36 @@ const finishSurvey = () => {
 .card-container {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Changed from center to flex-start to utilize top space */
   justify-content: center;
   position: relative;
+  width: 100%;
+  padding: 0 16px 32px 16px; /* Added bottom padding */
+  box-sizing: border-box;
 }
 
 .question-card {
   width: 100%;
+  min-height: 60vh; /* Ensure card takes up significant vertical space */
   background: rgba(30, 41, 59, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(12px);
   border-radius: 24px;
   padding: 32px;
-  position: absolute; /* Essential for transition overlap */
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.question-text {
+  font-size: 36rpx; /* Increased font size */
+  font-weight: 600;
+  line-height: 1.6;
+  margin-bottom: 48px; /* Increased spacing */
+  color: #fff;
+  flex: 1; /* Allow text area to expand */
 }
 
 .glass-panel {
