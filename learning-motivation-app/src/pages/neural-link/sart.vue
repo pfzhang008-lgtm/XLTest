@@ -24,8 +24,8 @@
       <!-- Progress Bar -->
       <view class="progress-section">
         <view class="progress-label">
-          <text>剩余时间</text>
-          <text :class="{ 'text-red': timeLeft < 10 }">{{ timeLeft }}s</text>
+          <text>进度</text>
+          <text>{{ currentTrial }} / {{ maxTrials }}</text>
         </view>
         <view class="progress-track">
           <view class="progress-fill" :style="{ width: progressPercentage + '%' }"></view>
@@ -99,7 +99,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { onLoad } from '@dcloudio/uni-app';
 import CountdownOverlay from '@/components/CountdownOverlay.vue';
+import { getNormsByAge } from '@/utils/testConfigManager.js';
 
 // --- Icons (Data URIs) ---
 const icons = {
@@ -107,18 +109,18 @@ const icons = {
   chevron_right: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%237f1d1d%22%3E%3Cpath d%3D%22M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z%22%2F%3E%3C%2Fsvg%3E'
 };
 
-// --- Game Constants ---
-const TOTAL_TIME = 90;
-const STIMULUS_DURATION = 800;
+// --- Game Config & State ---
+const config = ref(null);
+const maxTrials = ref(40);
+const stimulusDuration = ref(800);
+const nogoProb = ref(0.15);
 const MIN_ISI = 1200;
 const MAX_ISI = 2500;
-const GO_PROBABILITY = 0.85; // Probability of Non-3 (Go)
 
-// --- State ---
-const timeLeft = ref(TOTAL_TIME);
+const currentTrial = ref(0);
 const isGameActive = ref(false);
 const showCountdown = ref(true);
-const progressPercentage = computed(() => (timeLeft.value / TOTAL_TIME) * 100);
+const progressPercentage = computed(() => (currentTrial.value / maxTrials.value) * 100);
 
 const currentStimulus = ref(null); // number | null
 const isVisible = ref(false);
@@ -131,18 +133,27 @@ const metrics = ref({
   hits: 0,
   omissions: 0, // Inattention
   falseAlarms: 0, // Impulsivity
-  correctRejections: 0
+  correctRejections: 0,
+  events: [] // { type: 'omission'|'commission', timestamp: ms }
 });
 
+const startTime = ref(0);
+
 // Timers
-let gameTimer = null;
 let stimulusTimer = null;
 let isiTimer = null;
 let feedbackTimer = null;
 
 // --- Lifecycle ---
-onMounted(() => {
-  // startGame(); // Moved to handleCountdownComplete
+onLoad(() => {
+  const userProfile = uni.getStorageSync('user_profile') || {};
+  const age = userProfile.age || 18;
+  config.value = getNormsByAge(age, 'sart');
+  if (config.value) {
+    maxTrials.value = config.value.totalTargets;
+    stimulusDuration.value = config.value.displayMs;
+    nogoProb.value = config.value.nogoProb;
+  }
 });
 
 onUnmounted(() => {
@@ -162,22 +173,15 @@ const goBack = () => {
 const startGame = () => {
   resetState();
   isGameActive.value = true;
-  
-  // Main countdown
-  gameTimer = setInterval(() => {
-    timeLeft.value--;
-    if (timeLeft.value <= 0) {
-      endGame();
-    }
-  }, 1000);
+  startTime.value = Date.now();
   
   // Start first round
   scheduleNextRound();
 };
 
 const resetState = () => {
-  timeLeft.value = TOTAL_TIME;
-  metrics.value = { hits: 0, omissions: 0, falseAlarms: 0, correctRejections: 0 };
+  currentTrial.value = 0;
+  metrics.value = { hits: 0, omissions: 0, falseAlarms: 0, correctRejections: 0, events: [] };
   currentStimulus.value = null;
   isVisible.value = false;
   hasActed.value = false;
@@ -185,15 +189,20 @@ const resetState = () => {
 };
 
 const stopAllTimers = () => {
-  clearInterval(gameTimer);
   clearTimeout(stimulusTimer);
   clearTimeout(isiTimer);
   clearTimeout(feedbackTimer);
 };
 
 const scheduleNextRound = () => {
+  if (currentTrial.value >= maxTrials.value) {
+    endGame();
+    return;
+  }
+
   const isi = Math.floor(Math.random() * (MAX_ISI - MIN_ISI + 1)) + MIN_ISI;
   isiTimer = setTimeout(() => {
+    currentTrial.value++;
     showStimulus();
   }, isi);
 };
@@ -201,15 +210,15 @@ const scheduleNextRound = () => {
 const showStimulus = () => {
   if (!isGameActive.value) return;
   
-  // Determine Type
-  const isGo = Math.random() < GO_PROBABILITY;
+  // Determine Type: No-Go if random < nogoProb
+  const isNoGo = Math.random() < nogoProb.value;
   
-  if (isGo) {
-    // Non-3 (0-9 excluding 3)
+  if (!isNoGo) {
+    // Go Stimulus (Non-3)
     const nums = [0, 1, 2, 4, 5, 6, 7, 8, 9];
     currentStimulus.value = nums[Math.floor(Math.random() * nums.length)];
   } else {
-    // 3 (No-Go)
+    // No-Go Stimulus (3)
     currentStimulus.value = 3;
   }
   
@@ -220,7 +229,7 @@ const showStimulus = () => {
   // Auto-hide after duration
   stimulusTimer = setTimeout(() => {
     hideStimulus();
-  }, STIMULUS_DURATION);
+  }, stimulusDuration.value);
 };
 
 const hideStimulus = () => {
@@ -229,7 +238,8 @@ const hideStimulus = () => {
   // Check for Omission (Go target appeared, user did nothing)
   if (currentStimulus.value !== 3 && !hasActed.value) {
     metrics.value.omissions++;
-    feedback.value = 'miss'; // Optional: show miss feedback
+    metrics.value.events.push({ type: 'omission', timestamp: Date.now() - startTime.value });
+    feedback.value = 'miss'; 
     clearFeedbackAfterDelay();
   } else if (currentStimulus.value === 3 && !hasActed.value) {
     metrics.value.correctRejections++;
@@ -258,6 +268,7 @@ const handleTap = () => {
   } else {
     // FALSE ALARM (Impulsivity) - Clicked on 3
     metrics.value.falseAlarms++;
+    metrics.value.events.push({ type: 'commission', timestamp: Date.now() - startTime.value });
     feedback.value = 'false-alarm';
     triggerPunishment();
   }
@@ -268,7 +279,6 @@ const handleTap = () => {
 const triggerPunishment = () => {
   // Haptic
   uni.vibrateShort();
-  // Visuals handled by template based on feedback === 'false-alarm'
 };
 
 const clearFeedbackAfterDelay = () => {
@@ -283,9 +293,27 @@ const endGame = () => {
   isGameActive.value = false;
   
   uni.showLoading({ title: '生成专注力报告...', mask: true });
+  
+  const resultPayload = {
+    metrics: {
+      totalTrials: maxTrials.value,
+      hits: metrics.value.hits,
+      omissions: metrics.value.omissions,
+      falseAlarms: metrics.value.falseAlarms,
+      errors: metrics.value.omissions + metrics.value.falseAlarms,
+      events: metrics.value.events
+    },
+    thresholds: {
+      excellentErrors: config.value ? config.value.excellentErrors : 0,
+      riskErrors: config.value ? config.value.riskErrors : 3
+    }
+  };
+
   setTimeout(() => {
     uni.hideLoading();
-    uni.redirectTo({ url: '/pages/neural-link/sart-result' });
+    uni.redirectTo({ 
+      url: `/pages/neural-link/sart-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}` 
+    });
   }, 1500);
 };
 

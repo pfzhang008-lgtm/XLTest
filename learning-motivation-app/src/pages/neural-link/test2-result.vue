@@ -56,13 +56,14 @@
             <text class="stat-label">干扰项误触</text>
           </view>
           <view class="stat-value-container">
-            <text class="stat-value">{{ errorCount }}</text>
+            <text class="stat-value">{{ metrics.errorCount }}</text>
             <text class="stat-unit">次</text>
           </view>
           <view class="progress-bar-bg">
-            <view class="progress-bar-fill red-fill" style="width: 85%"></view>
+            <view class="progress-bar-fill red-fill" :style="{ width: errorProgressWidth }"></view>
           </view>
-          <text class="stat-footer red-text">+85% 高于平均值</text>
+          <text class="stat-footer red-text" v-if="metrics.errorCount > 5">需提高准确率</text>
+          <text class="stat-footer white-text" v-else>控制良好</text>
         </view>
 
         <!-- Stat Card 2 -->
@@ -73,13 +74,13 @@
             <text class="stat-label">专注时长</text>
           </view>
           <view class="stat-value-container">
-            <text class="stat-value">{{ focusDuration }}</text>
+            <text class="stat-value">{{ formattedFocusDuration }}</text>
             <text class="stat-unit white-text">秒</text>
           </view>
           <view class="progress-bar-bg">
-            <view class="progress-bar-fill white-fill" style="width: 10%"></view>
+            <view class="progress-bar-fill white-fill" :style="{ width: focusProgressWidth }"></view>
           </view>
-          <text class="stat-footer gray-text">严重不足</text>
+          <text class="stat-footer gray-text">平均连续专注</text>
         </view>
       </view>
 
@@ -105,82 +106,6 @@
 <script>
 import AppTabBar from '@/components/AppTabBar.vue';
 
-const RANK_SYSTEM = [
-  {
-    threshold: 20, // < 20s
-    title: '鹰眼级',
-    sub: 'EAGLE EYE',
-    desc: '前额叶超频状态，具备顶尖的视觉锁定能力。',
-    color: '#00E5FF' // Cyan
-  },
-  {
-    threshold: 30, // 20-30s
-    title: '猎豹级',
-    sub: 'CHEETAH',
-    desc: '注意力聚焦密度极高，能高效过滤干扰。',
-    color: '#10B981' // Green
-  },
-  {
-    threshold: 45, // 30-45s
-    title: '人类基准',
-    sub: 'BASELINE',
-    desc: '注意力机制运行平稳，属于标准碳基生物水平。',
-    color: '#F59E0B' // Yellow
-  },
-  {
-    threshold: 60, // 45-60s
-    title: '水母级',
-    sub: 'JELLYFISH',
-    desc: '注意力呈漂浮状态，难以对低刺激信息（如书本）聚焦。',
-    color: '#FF6B00' // Orange
-  },
-  {
-    threshold: 9999, // > 60s
-    title: '金鱼级',
-    sub: 'GOLDFISH',
-    desc: '严重警报：大脑已被算法重塑，无法维持线性思考。',
-    color: '#FF0000' // Red
-  }
-];
-
-const TRAINING_RANK_SYSTEM = [ 
-   { 
-     threshold: 20, // < 20s (S级) 
-     title: '光量子态', // 原：鹰眼级 
-     sub: 'PHOTON STATE', 
-     desc: '【完美聚焦】你的思维像光束一样精准犀利。前额叶处于超频状态，具备顶尖的视觉锁定能力。', 
-     color: '#00E5FF' // Cyan (保持青色) 
-   }, 
-   { 
-     threshold: 30, // 20-30s (A级) 
-     title: '等离子态', // 原：猎豹级 
-     sub: 'PLASMA MODE', 
-     desc: '【高能反应】专注引擎运转极佳。你的大脑拥有强大的瞬间爆发力，能够高效过滤环境干扰。', 
-     color: '#10B981' // Green (保持绿色) 
-   }, 
-   { 
-     threshold: 45, // 30-45s (B级 - 普通) 
-     title: '聚变蓄能', // 原：人类基准 
-     sub: 'CHARGING...', 
-     desc: '【能量积蓄中】你的大脑反应平稳，正在为下一次爆发积蓄力量。虽然尚未完全激活，但潜力值巨大。', 
-     color: '#F59E0B' // Yellow (保持黄色) 
-   }, 
-   { 
-     threshold: 60, // 45-60s (C级 - 走神) 
-     title: '广域星云', // 原：水母级 
-     sub: 'NEBULA CLOUD', 
-     desc: '【思维弥散】你的注意力像星云一样广阔且发散。这代表极强的想象力，但我们需要训练它“坍缩”成一颗恒星。', 
-     color: '#A855F7' // Purple (改为紫色，代表神秘/发散，而非警告) 
-   }, 
-   { 
-     threshold: 9999, // > 60s (D级 - 严重走神) 
-     title: '深空漫游', // 原：金鱼级 
-     sub: 'DEEP ROAMER', 
-     desc: '【自由探索】你的思维像不受引力束缚的漫游者，极具探索欲但缺乏导航。别担心，我们将为你装配“专注导航系统”。', 
-     color: '#FF6B00' // Warm Orange (改为暖橙色，避免使用刺眼的红色) 
-   } 
- ];
-
 export default {
   components: {
     AppTabBar
@@ -189,56 +114,112 @@ export default {
     return {
       statusBarHeight: 20,
       brainImageUrl: '/static/brain-diagnosis.svg',
-      focusDuration: '< 3',
-      errorCount: 12,
-      focusLevel: '金鱼级',
-      analysisText: '由于长期暴露在高强度短视频刺激下，你的大脑奖励回路已出现“钝化”。普通的阅读和思考无法产生足够的多巴胺，导致你无法集中注意力。',
-      rankColor: '#FF0000',
-      rankSub: 'GOLDFISH',
+      
+      // Data from payload
+      metrics: {
+        totalTime: 0,
+        errorCount: 0,
+        avgFocus: 0
+      },
+      thresholds: {
+        excellentSec: 25,
+        riskSec: 45
+      },
+
+      // UI State
+      focusLevel: '计算中...',
+      rankSub: 'CALCULATING',
+      analysisText: '正在分析您的神经元连接数据...',
+      rankColor: '#F59E0B',
       mode: ''
     };
+  },
+  computed: {
+    formattedFocusDuration() {
+      if (!this.metrics.avgFocus) return '-';
+      if (this.metrics.avgFocus < 3000) {
+        return '< 3';
+      } else {
+        return (this.metrics.avgFocus / 1000).toFixed(1);
+      }
+    },
+    // Dynamic progress bar width for error count (visual estimation)
+    errorProgressWidth() {
+      // Arbitrary cap for visual
+      const max = 20; 
+      const pct = Math.min(100, (this.metrics.errorCount / max) * 100);
+      return `${pct}%`;
+    },
+    // Dynamic progress bar width for focus duration
+    focusProgressWidth() {
+      // Arbitrary max 10s
+      const max = 10000; 
+      const pct = Math.min(100, (this.metrics.avgFocus / max) * 100);
+      return `${pct}%`;
+    }
   },
   onLoad(options) {
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
-    
-    // Parse results from URL parameters
-    if (options.errorCount) {
-      this.errorCount = parseInt(options.errorCount);
-    }
 
     if (options.mode) {
       this.mode = options.mode;
     }
     
-    // Calculate Rank based on totalDuration
-    if (options.totalDuration) {
-      const duration = parseFloat(options.totalDuration);
-      let rankSystem = RANK_SYSTEM;
-      
-      if (this.mode === 'training') {
-        rankSystem = TRAINING_RANK_SYSTEM;
+    // Parse Standardized Payload
+    if (options.data) {
+      try {
+        const payload = JSON.parse(decodeURIComponent(options.data));
+        if (payload.metrics) {
+          this.metrics = { ...this.metrics, ...payload.metrics };
+        }
+        if (payload.thresholds) {
+          this.thresholds = { ...this.thresholds, ...payload.thresholds };
+        }
+      } catch (e) {
+        console.error('Failed to parse result data', e);
       }
-      
-      const rank = rankSystem.find(r => duration < r.threshold) || rankSystem[rankSystem.length - 1];
-      
-      this.focusLevel = rank.title;
-      this.rankSub = rank.sub;
-      this.analysisText = rank.desc;
-      this.rankColor = rank.color;
+    } else {
+      // Legacy / Direct URL fallback
+      if (options.totalDuration) this.metrics.totalTime = parseFloat(options.totalDuration);
+      if (options.errorCount) this.metrics.errorCount = parseInt(options.errorCount);
+      if (options.avgFocus) this.metrics.avgFocus = parseInt(options.avgFocus);
     }
-
-    // Keep displaying avgFocus in the stat card if available
-    if (options.avgFocus) {
-      const avgMs = parseInt(options.avgFocus);
-      if (avgMs < 3000) {
-        this.focusDuration = '< 3';
-      } else {
-        this.focusDuration = (avgMs / 1000).toFixed(1);
-      }
-    }
+    
+    this.evaluateResult();
   },
   methods: {
+    evaluateResult() {
+      const time = this.metrics.totalTime;
+      const { excellentSec, riskSec } = this.thresholds;
+
+      // Determine Rank based on thresholds
+      if (time <= excellentSec) {
+        this.setRankStyle('EXCELLENT');
+      } else if (time >= riskSec) {
+        this.setRankStyle('RISK');
+      } else {
+        this.setRankStyle('NORMAL');
+      }
+    },
+    setRankStyle(status) {
+       if (status === 'EXCELLENT') {
+         this.focusLevel = '鹰眼级';
+         this.rankSub = 'EAGLE EYE';
+         this.analysisText = '前额叶超频状态，具备顶尖的视觉锁定能力。';
+         this.rankColor = '#00E5FF'; // Cyan
+       } else if (status === 'RISK') {
+         this.focusLevel = '金鱼级';
+         this.rankSub = 'GOLDFISH';
+         this.analysisText = '严重警报：大脑已被算法重塑，无法维持线性思考。';
+         this.rankColor = '#FF0000'; // Red
+       } else {
+         this.focusLevel = '人类基准';
+         this.rankSub = 'BASELINE';
+         this.analysisText = '注意力机制运行平稳，属于标准碳基生物水平。';
+         this.rankColor = '#F59E0B'; // Yellow (Amber)
+       }
+    },
     goBack() {
       uni.navigateBack();
     },

@@ -75,6 +75,8 @@
 </template>
 
 <script>
+import { getNormsByAge } from '@/utils/testConfigManager.js';
+
 export default {
   data() {
     return {
@@ -100,13 +102,27 @@ export default {
       focusSegments: [],
       currentFocusBlock: 0,
       FOCUS_THRESHOLD: 1500, // 1.5 seconds
-      mode: ''
+      mode: '',
+      config: null,
+      excellentSec: 25,
+      riskSec: 45
     };
   },
   onLoad(options) {
     if (options && options.mode) {
       this.mode = options.mode;
     }
+    
+    // Load config based on age
+    const userProfile = uni.getStorageSync('user_profile') || {};
+    const age = userProfile.age || 18;
+    this.config = getNormsByAge(age, 'schulte');
+    
+    if (this.config) {
+      this.excellentSec = this.config.excellentSec || 25;
+      this.riskSec = this.config.riskSec || 45;
+    }
+
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
 
@@ -307,8 +323,20 @@ export default {
       
       console.log(`Schulte Grid: Results - Errors: ${this.errorCount}, AvgFocus: ${avgFocus}ms, Duration: ${totalDuration}s`);
       
+      const resultPayload = {
+        metrics: {
+          totalTime: totalDuration,
+          errorCount: this.errorCount,
+          avgFocus: avgFocus
+        },
+        thresholds: {
+          excellentSec: this.excellentSec,
+          riskSec: this.riskSec
+        }
+      };
+
       uni.navigateTo({
-        url: `/pages/neural-link/test2-result?errorCount=${this.errorCount}&avgFocus=${avgFocus}&totalDuration=${totalDuration}&mode=${this.mode}`
+        url: `/pages/neural-link/test2-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}`
       });
     },
     clearTimers() {

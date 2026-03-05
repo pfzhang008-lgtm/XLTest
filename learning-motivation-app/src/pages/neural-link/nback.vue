@@ -25,9 +25,9 @@
       <view class="stat-card">
         <view class="stat-header">
           <image class="stat-icon" :src="icons.check_circle" mode="aspectFit"></image>
-          <text class="stat-label">剩余扫描时间</text>
+          <text class="stat-label">进度</text>
         </view>
-        <text class="stat-value">{{ timeLeft }}s</text>
+        <text class="stat-value">{{ currentTrial }} / {{ maxTrials }}</text>
       </view>
     </view>
 
@@ -104,6 +104,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { onLoad } from '@dcloudio/uni-app';
+import { getNormsByAge } from '@/utils/testConfigManager.js';
 
 // --- Icons (Static Files) ---
 const icons = {
@@ -114,26 +116,30 @@ const icons = {
   close: '/static/icon-close.svg'
 };
 
-const N = 2; // N-Back level
-const INTERVAL_MS = 2000;
-const FLASH_DURATION_MS = 500;
-const TOTAL_TIME = 60;
+// Config state
+const config = ref(null);
+const N = ref(2); // N-Back level
+const intervalMs = ref(2000);
+const displayMs = ref(500);
+const maxTrials = ref(25);
 
 const currentActiveIndex = ref(-1);
 const history = ref([]); // Queue of indices
-const timeLeft = ref(TOTAL_TIME);
-const score = ref(0);
+const currentTrial = ref(0);
+const score = ref(0); // Hits
+const falseAlarms = ref(0);
+const misses = ref(0);
+const correctRejections = ref(0); // Track correct rejections for accuracy calc
+
 const feedback = ref(null); // 'correct', 'wrong', null
 const feedbackText = ref('');
 const isGameActive = ref(false);
 
-let gameTimer = null;
 let sequenceTimer = null;
-let flashTimer = null;
 let currentRoundMatchPressed = false;
 
 // --- Computed ---
-const isObservationMode = computed(() => history.value.length <= N);
+const isObservationMode = computed(() => history.value.length <= N.value);
 
 const modeText = computed(() => {
   return isObservationMode.value ? '观察模式 (Observation)' : '判断模式 (Judgment)';
@@ -143,44 +149,124 @@ const modeClass = computed(() => {
   return isObservationMode.value ? 'mode-observation' : 'mode-judgment';
 });
 
+const progressPercent = computed(() => {
+  return Math.min(100, (currentTrial.value / maxTrials.value) * 100);
+});
+
+// --- Lifecycle ---
+onLoad(() => {
+  const userProfile = uni.getStorageSync('user_profile') || {};
+  const age = userProfile.age || 18;
+  config.value = getNormsByAge(age, 'nback');
+  
+  if (config.value) {
+    N.value = config.value.level || 2;
+    maxTrials.value = config.value.totalTrials || 25;
+    displayMs.value = config.value.displayMs || 1500;
+    intervalMs.value = config.value.intervalMs || 2000;
+  }
+});
+
+onMounted(() => {
+  startGame();
+});
+
+onUnmounted(() => {
+  clearTimeout(sequenceTimer);
+});
+
 // --- Game Logic ---
 const startGame = () => {
   console.log('N-Back: Game Started');
   isGameActive.value = true;
-  timeLeft.value = TOTAL_TIME;
+  currentTrial.value = 0;
   score.value = 0;
+  falseAlarms.value = 0;
+  misses.value = 0;
+  correctRejections.value = 0;
   history.value = [];
   currentActiveIndex.value = -1;
   
-  // Start countdown
-  gameTimer = setInterval(() => {
-    timeLeft.value--;
-    if (timeLeft.value <= 0) {
-      endGame();
-    }
-  }, 1000);
-
   // Start sequence
   nextStep();
-  sequenceTimer = setInterval(nextStep, INTERVAL_MS);
 };
 
 const endGame = () => {
   console.log('N-Back: Game Ended');
-  clearInterval(gameTimer);
-  clearInterval(sequenceTimer);
-  clearTimeout(flashTimer);
+  clearTimeout(sequenceTimer);
   isGameActive.value = false;
   currentActiveIndex.value = -1;
   
   uni.showLoading({ title: '生成脑部扫描报告...', mask: true });
+  
+  // Calculate accuracy: (Hits + Correct Rejections) / Total Judgments
+  // Total Judgments = maxTrials - N (since first N are observation)
+  const totalJudgments = Math.max(1, maxTrials.value - N.value);
+  // Note: We need to be careful. currentTrial goes up to maxTrials.
+  // history.length will be maxTrials.
+  // Judgments start from index N (0-based) to maxTrials-1.
+  // Count: maxTrials - N.
+  
+  const accuracy = (score.value + correctRejections.value) / totalJudgments;
+
+  const resultPayload = {
+    metrics: {
+      totalTrials: maxTrials.value,
+      level: N.value,
+      hits: score.value,
+      falseAlarms: falseAlarms.value,
+      misses: misses.value,
+      correctRejections: correctRejections.value,
+      accuracy: accuracy
+    },
+    thresholds: {
+      excellentAccuracy: config.value ? config.value.excellentAccuracy : 0.8,
+      riskAccuracy: config.value ? config.value.riskAccuracy : 0.5
+    }
+  };
+
   setTimeout(() => {
     uni.hideLoading();
-    uni.redirectTo({ url: '/pages/neural-link/nback-result' });
+    uni.redirectTo({ 
+      url: `/pages/neural-link/nback-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}` 
+    });
   }, 1500);
 };
 
 const nextStep = () => {
+  if (!isGameActive.value) return;
+
+  // Process previous step results (if not observation mode)
+  const historyLen = history.value.length;
+  if (historyLen > N.value) {
+    // Check if user missed a match in the PREVIOUS step
+    // The previous step index was history[historyLen - 1]
+    // The target for that step was history[historyLen - 1 - N]
+    const prevIndex = history.value[historyLen - 1];
+    const prevTarget = history.value[historyLen - 1 - N.value];
+    
+    if (prevIndex === prevTarget) {
+      // It was a match target
+      if (!currentRoundMatchPressed) {
+        // User didn't press match -> Miss
+        misses.value++;
+        // Optional: Feedback for miss?
+      }
+    } else {
+      // It was NOT a match target
+      if (!currentRoundMatchPressed) {
+        // User didn't press match -> Correct Rejection
+        correctRejections.value++;
+      }
+    }
+  }
+
+  // Check for end of game
+  if (currentTrial.value >= maxTrials.value) {
+    endGame();
+    return;
+  }
+
   // Reset per-round state
   currentRoundMatchPressed = false;
   feedback.value = null;
@@ -188,28 +274,37 @@ const nextStep = () => {
 
   // Determine next index
   let nextIndex;
-  const historyLen = history.value.length;
   
-  // Target Probability: ~30% match chance if we have enough history
-  if (historyLen >= N && Math.random() < 0.3) {
-    nextIndex = history.value[historyLen - N];
+  // Target Probability logic
+  // We want to ensure enough targets appear. ~30% chance.
+  // Only applicable if we have enough history to form a match (historyLen >= N)
+  const canFormMatch = historyLen >= N.value;
+  
+  if (canFormMatch && Math.random() < 0.3) {
+    nextIndex = history.value[historyLen - N.value];
   } else {
-    // Random other index (try to avoid accidental match to keep probability clean, but simple random is usually fine)
+    // Random other index
     do {
       nextIndex = Math.floor(Math.random() * 9);
-    } while (historyLen >= N && nextIndex === history.value[historyLen - N] && Math.random() > 0.1); // Small chance to allow accidental random match
+    } while (canFormMatch && nextIndex === history.value[historyLen - N.value] && Math.random() > 0.1); 
   }
 
   // Update history
   history.value.push(nextIndex);
+  currentTrial.value++;
   
   // Flash square
   currentActiveIndex.value = nextIndex;
   
-  // Turn off after duration
-  flashTimer = setTimeout(() => {
+  // Schedule hide
+  setTimeout(() => {
     currentActiveIndex.value = -1;
-  }, FLASH_DURATION_MS);
+  }, displayMs.value);
+  
+  // Schedule next step (Display Time + Interval Time)
+  // Wait: The requirement says "图片消失后的黑屏间隔时间：改为 config.intervalMs".
+  // So total cycle = displayMs + intervalMs
+  sequenceTimer = setTimeout(nextStep, displayMs.value + intervalMs.value);
 };
 
 const handleMatch = () => {
@@ -218,16 +313,11 @@ const handleMatch = () => {
   
   currentRoundMatchPressed = true;
   
-  // Logic: Check if current step matches N steps ago
-  // Note: history has already been pushed with the current index in nextStep()
-  // So current index is history[history.length - 1]
-  // Target index is history[history.length - 1 - N]
-  
   const historyLen = history.value.length;
-  if (historyLen <= N) return; // Should be covered by isObservationMode but safety check
-
+  // Current index displayed is history[historyLen - 1]
   const currentIndex = history.value[historyLen - 1];
-  const targetIndex = history.value[historyLen - 1 - N];
+  // Target is N steps back: history[historyLen - 1 - N]
+  const targetIndex = history.value[historyLen - 1 - N.value];
 
   if (currentIndex === targetIndex) {
     // Hit (Correct)
@@ -237,6 +327,7 @@ const handleMatch = () => {
   } else {
     // False Alarm (Wrong)
     console.log('N-Back: Match Result - Wrong');
+    falseAlarms.value++;
     triggerFeedback('wrong');
   }
 };
@@ -246,7 +337,7 @@ const triggerFeedback = (type) => {
   if (type === 'correct') {
     feedbackText.value = '+1';
   } else {
-    feedbackText.value = 'MISS';
+    feedbackText.value = 'MISS'; // Using 'MISS' text for error, though strictly it's an error
     uni.vibrateShort();
   }
   
@@ -261,17 +352,6 @@ const goBack = () => {
   console.log('N-Back: User clicked back button');
   uni.navigateBack();
 };
-
-// --- Lifecycle ---
-onMounted(() => {
-  startGame();
-});
-
-onUnmounted(() => {
-  clearInterval(gameTimer);
-  clearInterval(sequenceTimer);
-  clearTimeout(flashTimer);
-});
 </script>
 
 <style scoped>

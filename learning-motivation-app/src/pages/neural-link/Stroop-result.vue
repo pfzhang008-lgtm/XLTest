@@ -39,16 +39,16 @@
       <!-- Data Grid -->
       <view class="data-grid">
         <!-- Card 1: Cognitive Status -->
-        <view class="data-card rust-card">
+        <view class="data-card" :class="cognitiveStatus.colorClass">
           <view class="card-header">
             <text class="card-title">认知状态</text>
             <text class="material-icons card-icon">psychology_alt</text>
           </view>
           <view class="card-main">
-            <text class="card-value-lg">重度生锈</text>
+            <text class="card-value-lg">{{ cognitiveStatus.text }}</text>
             <view class="status-tag">
-              <text class="tag-icon">!</text>
-              <text>极高风险</text>
+              <text class="tag-icon">{{ cognitiveStatus.icon }}</text>
+              <text>{{ cognitiveStatus.tag }}</text>
             </view>
           </view>
           <view class="progress-bar-bg">
@@ -123,28 +123,81 @@ export default {
       score: 0,
       errors: 0,
       avgTime: 450,
-      brainAge: 68
+      brainAge: 68,
+      thresholds: {
+        excellentErrors: 0,
+        riskErrors: 6
+      }
     };
+  },
+  computed: {
+    cognitiveStatus() {
+      // Use thresholds to determine status
+      if (this.errors <= this.thresholds.excellentErrors) {
+        return { 
+          text: '大脑年轻', 
+          tag: '巅峰状态', 
+          icon: 'check_circle', 
+          colorClass: 'green-card', // Need to add css or logic
+          risk: false 
+        };
+      } else if (this.errors >= this.thresholds.riskErrors) {
+        return { 
+          text: '重度生锈', 
+          tag: '极高风险', 
+          icon: '!', 
+          colorClass: 'rust-card', 
+          risk: true 
+        };
+      } else {
+        return { 
+          text: '轻度磨损', 
+          tag: '需要注意', 
+          icon: 'warning', 
+          colorClass: 'bronze-card', 
+          risk: false 
+        };
+      }
+    }
   },
   onLoad(options) {
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
     
-    if (options.score) {
+    if (options.data) {
+      try {
+        const data = JSON.parse(decodeURIComponent(options.data));
+        this.score = data.metrics.score;
+        this.errors = data.metrics.errors;
+        this.avgTime = data.metrics.avgTime;
+        if (data.thresholds) {
+          this.thresholds = data.thresholds;
+        }
+      } catch (e) {
+        console.error('Failed to parse result data', e);
+      }
+    } else if (options.score) {
+      // Legacy support
       this.score = parseInt(options.score);
       this.errors = parseInt(options.errors) || 0;
       this.avgTime = parseInt(options.avgTime) || 450;
-      
-      this.calculateBrainAge();
     }
+      
+    this.calculateBrainAge();
   },
   methods: {
     calculateBrainAge() {
       // Base Age
       let age = 16;
       
-      // Error Penalty (+5 years per error)
-      age += (this.errors * 5);
+      // Error Penalty based on thresholds
+      // If errors > excellent, add age.
+      if (this.errors > this.thresholds.excellentErrors) {
+         // Scale errors between excellent and risk
+         // e.g. exc=0, risk=6. errors=3.
+         // 3/6 = 0.5. Add some years.
+         age += this.errors * 5; 
+      }
       
       // Speed Penalty (Normal ~250ms)
       // +1 year for every 20ms over 250ms
@@ -551,6 +604,28 @@ page {
   line-height: 1.6;
   text-align: justify;
 }
+
+/* Dynamic Card Styles */
+.rust-card {
+  background: #2D1B12;
+  border-color: #4a3b32;
+}
+.rust-card .status-tag { color: #ef4444; }
+.rust-card .tag-icon { background: #ef4444; color: #2D1B12; }
+
+.green-card {
+  background: rgba(6, 78, 59, 0.6); /* emerald-900 */
+  border-color: #059669;
+}
+.green-card .status-tag { color: #34d399; }
+.green-card .tag-icon { background: #34d399; color: #064e3b; }
+
+.bronze-card {
+  background: rgba(69, 26, 3, 0.6); /* amber-950 */
+  border-color: #b45309;
+}
+.bronze-card .status-tag { color: #fbbf24; }
+.bronze-card .tag-icon { background: #fbbf24; color: #451a03; }
 
 .spacer {
   height: 200rpx;

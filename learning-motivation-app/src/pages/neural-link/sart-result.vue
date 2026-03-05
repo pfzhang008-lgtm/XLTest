@@ -7,8 +7,8 @@
     <view class="header-section fade-in delay-0">
       <view class="header-label">[DIAGNOSTICS COMPLETE]</view>
       <view class="verdict-block">
-        <text class="verdict-text">STATUS: <text class="highlight-red">HIGH RISK</text></text>
-        <text class="verdict-sub">多巴胺戒断 / 抑制力受损</text>
+        <text class="verdict-text">STATUS: <text :class="diagnosis.statusColor">{{ diagnosis.statusText }}</text></text>
+        <text class="verdict-sub">{{ diagnosis.subText }}</text>
       </view>
       
       <!-- Simulated ECG Timeline -->
@@ -24,10 +24,8 @@
         ></view>
         <view class="timeline-scan-line"></view>
         <view class="timeline-labels">
-          <text>0s</text>
-          <text>30s</text>
-          <text>60s</text>
-          <text>90s</text>
+          <text>Start</text>
+          <text>End</text>
         </view>
       </view>
     </view>
@@ -38,10 +36,10 @@
       <view class="symptom-card fade-in delay-1">
         <view class="card-header">
           <text class="card-title">神经掉线 (Neural Lapses)</text>
-          <text class="card-value cyan">6 次</text>
+          <text class="card-value cyan">{{ metrics.omissions }} 次</text>
         </view>
         <view class="diagnosis-text">
-          "唤醒度极度低下。在低频刺激（枯燥）环境中，大脑频繁强制进入待机发呆状态。"
+          "{{ diagnosis.desc1 }}"
         </view>
         <view class="impact-text">
           <text class="impact-label">现实映射：</text>
@@ -53,10 +51,10 @@
       <view class="symptom-card fade-in delay-2">
         <view class="card-header">
           <text class="card-title">冲动误报 (Impulsive Actions)</text>
-          <text class="card-value red">8 次</text>
+          <text class="card-value red">{{ metrics.falseAlarms }} 次</text>
         </view>
         <view class="diagnosis-text">
-          "前额叶抑制功能障碍。习惯算法投喂后，大脑失去主动刹车与抗干扰能力。"
+          "{{ diagnosis.desc2 }}"
         </view>
         <view class="impact-text">
           <text class="impact-label">现实映射：</text>
@@ -79,18 +77,102 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { onLoad } from '@dcloudio/uni-app';
 
 const goBack = () => {
   uni.navigateBack();
 };
 
-// Mock Data for Timeline
+// Data State
+const metrics = ref({
+  hits: 0,
+  omissions: 0,
+  falseAlarms: 0,
+  errors: 0,
+  events: []
+});
+
+const thresholds = ref({
+  excellentErrors: 1,
+  riskErrors: 3
+});
+
+// Computed Diagnosis
+const diagnosis = computed(() => {
+  const totalErrors = metrics.value.errors;
+  
+  if (totalErrors <= thresholds.value.excellentErrors) {
+    return {
+      status: 'OPTIMAL',
+      statusText: '神经巅峰',
+      statusColor: 'text-green', // Need to add this class
+      subText: '多巴胺调节机制极佳',
+      desc1: '唤醒度极佳。在高强度持续专注任务中，大脑保持了极高的信噪比。',
+      desc2: '前额叶抑制功能强劲。能够有效过滤干扰，精准控制冲动。',
+      risk: false
+    };
+  } else if (totalErrors >= thresholds.value.riskErrors) {
+    return {
+      status: 'HIGH RISK',
+      statusText: '高危预警',
+      statusColor: 'highlight-red',
+      subText: '多巴胺戒断 / 抑制力受损',
+      desc1: '唤醒度低下。在低频刺激环境中，大脑频繁进入待机状态，导致漏报。',
+      desc2: '前额叶抑制功能障碍。难以抵抗冲动，极易受外界干扰。',
+      risk: true
+    };
+  } else {
+    return {
+      status: 'MODERATE',
+      statusText: '轻度磨损',
+      statusColor: 'text-yellow', // Need to add this class
+      subText: '专注力稳定性一般',
+      desc1: '唤醒度尚可。但在长时间任务中会出现偶尔的走神。',
+      desc2: '前额叶抑制功能一般。偶尔会出现冲动控制失误。',
+      risk: false
+    };
+  }
+});
+
+// Mock Data for Timeline (Fallback) or Real Data
 const timelineEvents = ref([]);
 
-onMounted(() => {
-  generateMockTimeline();
+onLoad((options) => {
+  if (options.data) {
+    try {
+      const data = JSON.parse(decodeURIComponent(options.data));
+      if (data.metrics) metrics.value = { ...metrics.value, ...data.metrics };
+      if (data.thresholds) thresholds.value = { ...thresholds.value, ...data.thresholds };
+      
+      // Process events for timeline
+      if (data.metrics.events && data.metrics.events.length > 0) {
+        processTimelineEvents(data.metrics.events, data.metrics.totalTrials); // Estimate duration?
+        // SART doesn't pass total duration, but we can estimate or just use relative time
+        // Actually events have timestamp relative to start.
+        // We can find max timestamp to normalize.
+      } else {
+        generateMockTimeline();
+      }
+    } catch (e) {
+      console.error('Failed to parse result data:', e);
+      generateMockTimeline();
+    }
+  } else {
+    generateMockTimeline();
+  }
 });
+
+const processTimelineEvents = (events, totalTrials) => {
+  if (!events.length) return;
+  const lastEvent = events[events.length - 1];
+  const maxTime = lastEvent.timestamp + 2000; // Add buffer
+  
+  timelineEvents.value = events.map(e => ({
+    time: (e.timestamp / maxTime) * 100,
+    type: e.type // 'omission' or 'commission'
+  }));
+};
 
 const generateMockTimeline = () => {
   // Generate random markers for 90s timeline
@@ -219,6 +301,9 @@ const startRehab = () => {
   font-size: 14px;
   color: #64748b;
 }
+
+.text-green { color: #4ade80; }
+.text-yellow { color: #facc15; }
 
 /* Timeline */
 .timeline-container {

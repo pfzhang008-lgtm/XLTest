@@ -105,6 +105,7 @@
 
 <script>
 import CountdownOverlay from '@/components/CountdownOverlay.vue';
+import { getNormsByAge } from '@/utils/testConfigManager.js';
 
 export default {
   components: {
@@ -119,28 +120,17 @@ export default {
       navPaddingBottom: 8, // Default
       
       // Game Config
+      config: null,
       maxRounds: 20,
-      roundDuration: 3000, // ms per round (not used strictly if using global timer, but prompt implies global timer)
-      // Prompt says "Timer: 00:15". Usually Stroop is timed. Let's say 15 seconds total or per round?
-      // "CURRENT SESSION 04 / 20" implies rounds.
-      // 15s is very short for 20 rounds. Maybe 15s remaining?
-      // Let's assume 15s is the *Limit* per round or Total time?
-      // Actually, usually it's "Do as many as you can" or "Complete 20 as fast as possible".
-      // Let's interpret: 20 Rounds fixed. Timer counts UP or DOWN.
-      // "Timer... 00:15". Let's set a global time limit or just a timer.
-      // Given "Brain Age", speed matters. Let's count DOWN from 60s for 20 rounds?
-      // Or maybe the prompt's "00:15" is just a placeholder.
-      // Let's make it: 20 Rounds. Timer counts total time taken.
+      timeLimitMs: 3000,
       
       currentRound: 1,
       startTime: 0,
       totalTime: 0,
-      timerInterval: null,
-      displayTime: 15, // Seconds remaining logic? Or elapsed?
-      // Let's try: User has 15 seconds to answer EACH? No, too easy.
-      // Let's try: Total time limit 30s?
-      // Let's just track elapsed time for scoring, but show a countdown for pressure?
-      // Let's stick to the visual: "00:15". Maybe it's counting down.
+      timer: null, // Per-trial timeout
+      displayTimer: null, // Visual countdown interval
+      displayTime: 3, // Seconds remaining for current trial
+      roundTimeout: null, // Exact timeout for the round
       
       // Game State
       currentWordText: '黄',
@@ -156,7 +146,7 @@ export default {
       feedback: null, // 'correct' | 'wrong'
       
       // Assets
-      words: ['红', '绿', '蓝', '黄', '紫', '黑'],
+      words: ['红', '蓝', '黄'],
       colors: {
         blue: '#0099FF', // Bright Blue
         yellow: '#FFFF00', // Bright Yellow
@@ -194,6 +184,18 @@ export default {
     this.navPaddingBottom = 4;
     // #endif
 
+    // Load User Config
+    const userProfile = uni.getStorageSync('user_profile') || {};
+    const userAge = userProfile.age || 18; // Default to 18 if not found
+    
+    // Get norms for Stroop
+    this.config = getNormsByAge(userAge, 'stroop');
+    
+    if (this.config) {
+      this.maxRounds = this.config.totalTrials;
+      this.timeLimitMs = this.config.timeLimitMs;
+    }
+
     // this.startGame(); // Moved to handleCountdownComplete
   },
   onUnload() {
@@ -212,34 +214,48 @@ export default {
       this.score = 0;
       this.errors = 0;
       this.reactionTimes = [];
-      this.displayTime = 20; // 20 seconds to finish 20 rounds? Or just a timer.
-      // Let's make it a countdown. If 0, game over.
+      // this.displayTime = 20; // Removed global timer
       
+      this.startTime = Date.now(); // Track total session time
       this.nextRound();
-      this.startTimer();
     },
     
     startTimer() {
       // Clear existing timer if any
       this.stopTimer();
       
-      this.startTime = Date.now();
-      // Start with 20 seconds
-      this.displayTime = 20; 
+      // Set display time (seconds)
+      this.displayTime = Math.ceil(this.timeLimitMs / 1000);
       
+      // Visual Countdown
       this.timerInterval = setInterval(() => {
         if (this.displayTime > 0) {
           this.displayTime--;
-        } else {
-          // Time's up!
-          this.stopTimer();
-          this.finishGame(); 
         }
       }, 1000);
+
+      // Logical Timeout
+      this.roundTimeout = setTimeout(() => {
+        this.handleTimeout();
+      }, this.timeLimitMs);
     },
     
     stopTimer() {
       if (this.timerInterval) clearInterval(this.timerInterval);
+      if (this.roundTimeout) clearTimeout(this.roundTimeout);
+    },
+
+    handleTimeout() {
+      this.stopTimer();
+      this.errors++;
+      this.feedback = 'wrong';
+      uni.vibrateShort();
+      
+      // Auto proceed
+      setTimeout(() => {
+        this.currentRound++;
+        this.nextRound();
+      }, 300);
     },
     
     nextRound() {
@@ -250,6 +266,9 @@ export default {
       
       this.roundStartTime = Date.now();
       this.feedback = null;
+      
+      // Start the per-round timer
+      this.startTimer();
       
       // 1. Decide Target Ink Color
       const targetTypes = ['blue', 'yellow', 'red'];
@@ -304,6 +323,8 @@ export default {
     handleInput(inputType) {
       if (this.feedback) return; // Prevent double tap
       
+      this.stopTimer(); // Stop the timer immediately on input
+
       const reactionTime = Date.now() - this.roundStartTime;
       this.reactionTimes.push(reactionTime);
       
@@ -329,11 +350,29 @@ export default {
     finishGame() {
       this.stopTimer();
       const totalTime = Date.now() - this.startTime;
-      const avgReaction = this.reactionTimes.reduce((a, b) => a + b, 0) / this.reactionTimes.length;
+      const avgReaction = this.reactionTimes.length > 0
+        ? this.reactionTimes.reduce((a, b) => a + b, 0) / this.reactionTimes.length
+        : 0;
       
+      // Standardized Payload
+      const resultPayload = {
+        metrics: {
+          totalTrials: this.maxRounds,
+          errors: this.errors,
+          score: this.score, // correct count
+          avgTime: Math.round(avgReaction),
+          totalTime: totalTime
+        },
+        thresholds: {
+          excellentErrors: this.config ? this.config.excellentErrors : 0,
+          riskErrors: this.config ? this.config.riskErrors : 6,
+          timeLimitMs: this.timeLimitMs
+        }
+      };
+
       // Navigate to Result
       uni.redirectTo({
-        url: `/pages/neural-link/Stroop-result?score=${this.score}&errors=${this.errors}&avgTime=${Math.round(avgReaction)}&totalTime=${totalTime}`
+        url: `/pages/neural-link/Stroop-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}`
       });
     }
   }

@@ -126,6 +126,7 @@
 
 <script>
 import CountdownOverlay from '@/components/CountdownOverlay.vue';
+import { getNormsByAge } from '@/utils/testConfigManager.js';
 
 export default {
   components: {
@@ -149,6 +150,7 @@ export default {
       falseStartCount: 0,
       currentRound: 0,
       maxRounds: 5,
+      config: null, // Dynamic configuration
       
       // Hardware Monitor Data
       fps: 60.0,
@@ -186,6 +188,15 @@ export default {
   onLoad() {
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
+
+    // Load User Config
+    const userProfile = uni.getStorageSync('user_profile') || {};
+    const userAge = userProfile.age || 18;
+    this.config = getNormsByAge(userAge, 'pvt');
+    
+    if (this.config) {
+      this.maxRounds = this.config.maxRounds;
+    }
 
     // #ifdef MP-WEIXIN
     const menuButton = uni.getMenuButtonBoundingClientRect();
@@ -290,8 +301,11 @@ export default {
     },
     
     scheduleTrigger() {
-      // Random delay 2000-5000ms
-      const delay = Math.floor(Math.random() * 3000) + 2000;
+      // Use config for delay range (default: 2000-4000ms)
+      const min = this.config ? this.config.delayMinMs : 2000;
+      const max = this.config ? this.config.delayMaxMs : 4000;
+      const delay = Math.floor(Math.random() * (max - min)) + min;
+      
       this.timer = setTimeout(() => {
         if (this.state === 'READY') {
           this.triggerSignal();
@@ -378,12 +392,26 @@ export default {
     },
     
     completeTest() {
-      const jsonStr = JSON.stringify({
-        reactionTimes: this.reactionTimes,
-        falseStartCount: this.falseStartCount
-      });
+      // Calculate Average Reaction Time
+      const avgReactionTime = this.reactionTimes.length > 0 
+        ? this.reactionTimes.reduce((a, b) => a + b, 0) / this.reactionTimes.length 
+        : 0;
+
+      const resultPayload = {
+        metrics: {
+          averageMs: Math.round(avgReactionTime),
+          falseStarts: this.falseStartCount,
+          reactionTimes: this.reactionTimes
+        },
+        thresholds: {
+          excellentMs: this.config.excellentMs,
+          riskMs: this.config.riskMs,
+          riskFalseStarts: this.config.riskFalseStarts
+        }
+      };
+
       uni.redirectTo({
-        url: `/pages/neural-link/PVT-result?data=${encodeURIComponent(jsonStr)}`
+        url: `/pages/neural-link/PVT-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}`
       });
     }
   }

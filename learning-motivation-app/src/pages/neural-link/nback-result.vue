@@ -21,12 +21,12 @@
         <text class="sub-title">深度扫描报告</text>
       </view>
 
-      <view class="warning-badge">
+      <view class="warning-badge" :style="{ borderColor: cognitiveStatus === 'RISK' ? 'rgba(255, 59, 59, 0.3)' : (cognitiveStatus === 'EXCELLENT' ? 'rgba(74, 222, 128, 0.3)' : 'rgba(0, 240, 255, 0.3)'), background: cognitiveStatus === 'RISK' ? 'rgba(255, 59, 59, 0.1)' : (cognitiveStatus === 'EXCELLENT' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(0, 240, 255, 0.1)') }">
         <view class="ping-wrapper">
-          <view class="ping-ring"></view>
-          <view class="ping-core"></view>
+          <view class="ping-ring" :style="{ backgroundColor: cognitiveStatus === 'RISK' ? '#ff3b3b' : (cognitiveStatus === 'EXCELLENT' ? '#4ade80' : '#00f0ff') }"></view>
+          <view class="ping-core" :style="{ backgroundColor: cognitiveStatus === 'RISK' ? '#ff3b3b' : (cognitiveStatus === 'EXCELLENT' ? '#4ade80' : '#00f0ff') }"></view>
         </view>
-        <text class="warning-text">STATUS: [高危] 深度脑雾现象</text>
+        <text :class="statusClass">{{ statusTitle }}</text>
       </view>
     </view>
 
@@ -40,7 +40,7 @@
           </view>
           <text class="card-label">测试参数</text>
           <view class="card-value-group">
-            <text class="card-value-lg">2-Back</text>
+            <text class="card-value-lg">{{ metrics.level }}-Back</text>
             <text class="card-value-sm text-cyan">视觉位置 / 空间</text>
           </view>
           <view class="card-line-cyan"></view>
@@ -51,10 +51,10 @@
           <view class="card-icon-wrapper">
             <image class="card-icon" :src="icons.timer" mode="aspectFit"></image>
           </view>
-          <text class="card-label">测试时长</text>
+          <text class="card-label">总测试项</text>
           <view class="card-value-group row">
-            <text class="card-value-lg font-mono">12:45</text>
-            <text class="card-value-xs text-dim">MIN</text>
+            <text class="card-value-lg font-mono">{{ metrics.totalTrials }}</text>
+            <text class="card-value-xs text-dim">TRIALS</text>
           </view>
           <view class="card-line-purple"></view>
         </view>
@@ -92,7 +92,7 @@
       </view>
 
       <!-- Diagnostic Card 1: Retention Rate -->
-      <view class="glass-panel diag-card border-l-cyan fadeInUp delay-1">
+      <view class="glass-panel diag-card fadeInUp delay-1" :class="cognitiveStatus === 'RISK' ? 'border-l-red' : (cognitiveStatus === 'EXCELLENT' ? 'border-l-green' : 'border-l-cyan')">
         <view class="diag-header">
           <view>
             <view class="diag-title-row">
@@ -103,12 +103,9 @@
           <view class="chart-circle">
              <!-- Simple CSS Circle Chart -->
              <view class="circle-bg"></view>
-             <view class="circle-progress" :style="{ transform: `rotate(${retentionRate * 3.6}deg)` }"></view>
-             <!-- Mask to make it an arc/ring if needed, or just simple circle -->
-             <!-- Using SVG for better control -->
              <svg class="circle-svg" viewBox="0 0 48 48">
                <circle cx="24" cy="24" r="20" fill="none" stroke="#2a2e36" stroke-width="4"></circle>
-               <circle cx="24" cy="24" r="20" fill="none" stroke="#00f0ff" stroke-width="4" 
+               <circle cx="24" cy="24" r="20" fill="none" :stroke="cognitiveStatus === 'RISK' ? '#ff3b3b' : (cognitiveStatus === 'EXCELLENT' ? '#4ade80' : '#00f0ff')" stroke-width="4" 
                        stroke-dasharray="125.6" :stroke-dashoffset="125.6 * (1 - retentionRate/100)"
                        stroke-linecap="round" transform="rotate(-90 24 24)"></circle>
              </svg>
@@ -117,18 +114,28 @@
         </view>
         
         <view class="diag-content">
-          <view class="diag-label cyan">
+          <view class="diag-label" :class="cognitiveStatus === 'RISK' ? 'red' : (cognitiveStatus === 'EXCELLENT' ? 'text-green' : 'cyan')">
             <image class="icon-sm" :src="icons.diagnosis" mode="aspectFit"></image>
-            <text>[诊断] 漏斗型大脑</text>
+            <text v-if="cognitiveStatus === 'RISK'">[诊断] 漏斗型大脑</text>
+            <text v-else-if="cognitiveStatus === 'EXCELLENT'">[诊断] 照相机记忆</text>
+            <text v-else>[诊断] 正常记忆波动</text>
           </view>
           <text class="diag-desc">
-            典型短视频投喂后遗症。高频瞬时刺激导致海马体长时记忆编码受阻，信息随进随出，无法形成有效沉淀。
+            <template v-if="cognitiveStatus === 'RISK'">
+              典型短视频投喂后遗症。高频瞬时刺激导致海马体长时记忆编码受阻，信息随进随出，无法形成有效沉淀。
+            </template>
+            <template v-else-if="cognitiveStatus === 'EXCELLENT'">
+              你的大脑工作记忆区如同高性能缓存，能精准捕捉并暂存连续信息，展现出极强的短期记忆编码能力。
+            </template>
+            <template v-else>
+              你的工作记忆处于正常范围。在信息量不过载的情况下能保持稳定追踪，但在高负荷下可能会有遗漏。
+            </template>
           </text>
         </view>
       </view>
 
       <!-- Diagnostic Card 2: Overlap Index -->
-      <view class="glass-panel diag-card border-l-red fadeInUp delay-2">
+      <view class="glass-panel diag-card fadeInUp delay-2" :class="ghostingLevel === 'HIGH' ? 'border-l-red' : (ghostingLevel === 'MEDIUM' ? 'border-l-orange' : 'border-l-green')">
         <view class="diag-header">
           <view>
             <view class="diag-title-row">
@@ -137,23 +144,32 @@
             </view>
           </view>
           <view class="risk-indicator">
-            <text class="risk-text red">HIGH</text>
+            <text class="risk-text" :class="ghostingLevel === 'HIGH' ? 'red' : (ghostingLevel === 'MEDIUM' ? 'text-orange' : 'text-green')">{{ ghostingLevel }}</text>
             <view class="risk-bars">
-              <view class="bar red"></view>
-              <view class="bar red"></view>
-              <view class="bar red"></view>
-              <view class="bar red-dim"></view>
+              <view class="bar" :class="ghostingLevel === 'HIGH' || ghostingLevel === 'MEDIUM' || ghostingLevel === 'LOW' ? (ghostingLevel === 'HIGH' ? 'red' : (ghostingLevel === 'MEDIUM' ? 'orange' : 'green')) : 'dim'"></view>
+              <view class="bar" :class="ghostingLevel === 'HIGH' || ghostingLevel === 'MEDIUM' ? (ghostingLevel === 'HIGH' ? 'red' : (ghostingLevel === 'MEDIUM' ? 'orange' : 'green')) : 'dim'"></view>
+              <view class="bar" :class="ghostingLevel === 'HIGH' ? 'red' : 'dim'"></view>
             </view>
           </view>
         </view>
         
         <view class="diag-content">
-          <view class="diag-label red">
+          <view class="diag-label" :class="ghostingLevel === 'HIGH' ? 'red' : (ghostingLevel === 'MEDIUM' ? 'text-orange' : 'text-green')">
             <image class="icon-sm" :src="icons.warning" mode="aspectFit"></image>
-            <text>[警报] 思维黏连</text>
+            <text v-if="ghostingLevel === 'HIGH'">[警报] 思维黏连</text>
+            <text v-else-if="ghostingLevel === 'MEDIUM'">[警告] 信号干扰</text>
+            <text v-else>[正常] 信号清晰</text>
           </view>
           <text class="diag-desc">
-            抗干扰能力极弱。面对复杂长文本时大脑易“死机”，旧信息未清除即叠加新信息，导致思维混乱。
+            <template v-if="ghostingLevel === 'HIGH'">
+              抗干扰能力极弱。面对复杂长文本时大脑易“死机”，旧信息未清除即叠加新信息，导致思维混乱。
+            </template>
+            <template v-else-if="ghostingLevel === 'MEDIUM'">
+              存在一定的信号干扰。偶尔会将相似的信息混淆，尤其是在快速切换任务时容易出现判断失误。
+            </template>
+            <template v-else>
+              抗干扰能力强。能有效过滤无关信息，准确区分当前任务与历史信息，思维清晰互不干扰。
+            </template>
           </text>
         </view>
       </view>
@@ -179,7 +195,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { onLoad } from '@dcloudio/uni-app';
 
 // --- Icons (Data URIs) ---
 const icons = {
@@ -192,9 +209,74 @@ const icons = {
   chevron_right: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2300f0ff%22%3E%3Cpath d%3D%22M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z%22%2F%3E%3C%2Fsvg%3E'
 };
 
-// --- Mock Data ---
-const retentionRate = ref(18); // 18%
-const overlapIndex = ref('HIGH');
+// --- State ---
+const metrics = ref({
+  totalTrials: 25,
+  level: 2,
+  hits: 0,
+  falseAlarms: 0,
+  misses: 0,
+  correctRejections: 0,
+  accuracy: 0
+});
+
+const thresholds = ref({
+  excellentAccuracy: 0.8,
+  riskAccuracy: 0.5
+});
+
+const cognitiveStatus = computed(() => {
+  const acc = metrics.value.accuracy;
+  if (acc >= thresholds.value.excellentAccuracy) return 'EXCELLENT';
+  if (acc <= thresholds.value.riskAccuracy) return 'RISK';
+  return 'NORMAL';
+});
+
+const retentionRate = computed(() => {
+  return Math.round(metrics.value.accuracy * 100);
+});
+
+// Overlap Index (Ghosting) based on False Alarms
+// More false alarms = higher ghosting
+const ghostingLevel = computed(() => {
+  const faRate = metrics.value.falseAlarms / (metrics.value.totalTrials || 1);
+  if (faRate > 0.3) return 'HIGH';
+  if (faRate > 0.1) return 'MEDIUM';
+  return 'LOW';
+});
+
+const statusTitle = computed(() => {
+  if (cognitiveStatus.value === 'EXCELLENT') return 'STATUS: [优秀] 记忆回路清晰';
+  if (cognitiveStatus.value === 'RISK') return 'STATUS: [高危] 深度脑雾现象';
+  return 'STATUS: [正常] 记忆功能稳定';
+});
+
+const statusClass = computed(() => {
+  if (cognitiveStatus.value === 'EXCELLENT') return 'text-green';
+  if (cognitiveStatus.value === 'RISK') return 'warning-text';
+  return 'text-cyan';
+});
+
+// --- Lifecycle ---
+onLoad((options) => {
+  if (options.data) {
+    try {
+      const payload = JSON.parse(decodeURIComponent(options.data));
+      // Standardized payload support
+      if (payload.metrics && payload.thresholds) {
+        metrics.value = { ...metrics.value, ...payload.metrics };
+        thresholds.value = { ...thresholds.value, ...payload.thresholds };
+      } 
+      // Legacy support (if any old format exists, though we refactored nback.vue)
+      else if (payload.accuracy !== undefined) {
+         metrics.value.accuracy = payload.accuracy;
+         if (payload.level) metrics.value.level = payload.level;
+      }
+    } catch (e) {
+      console.error('Failed to parse result data', e);
+    }
+  }
+});
 
 </script>
 
@@ -445,7 +527,13 @@ const overlapIndex = ref('HIGH');
 .risk-bars { display: flex; gap: 2px; margin-top: 4px; }
 .bar { width: 6px; height: 12px; border-radius: 2px; }
 .red { background-color: #ff3b3b; }
-.red-dim { background-color: rgba(255, 59, 59, 0.3); }
+.text-green { color: #4ade80; }
+.text-orange { color: #f97316; }
+.orange { background-color: #f97316; }
+.green { background-color: #4ade80; }
+.border-l-green { border-left-color: #4ade80; }
+.border-l-orange { border-left-color: #f97316; }
+.dim { background-color: #334155; }
 
 .diag-content {
   background: rgba(15, 17, 21, 0.5);

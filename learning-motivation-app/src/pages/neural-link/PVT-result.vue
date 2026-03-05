@@ -129,15 +129,19 @@ export default {
       reactionTime: 0,
       falseStartCount: 0,
       reactionTimes: [],
-      analysisResult: null
+      analysisResult: null,
+      thresholds: {} // Dynamic thresholds from config
     };
   },
   computed: {
     diagnosis() {
       const ms = this.reactionTime;
+      // Dynamic Thresholds
+      const excellent = this.thresholds.excellentMs || 220;
+      const risk = this.thresholds.riskMs || 350;
       
-      // Case A: < 160ms (Esports Pro)
-      if (ms < 160) {
+      // Case A: Excellent (Pro/Ace)
+      if (ms <= excellent) {
         return {
           title: '电竞职业级',
           subtitle: '突破生理极限的神经传导速度。',
@@ -148,31 +152,8 @@ export default {
         };
       }
       
-      // Case B: 160ms - 220ms (Ace Pilot)
-      if (ms <= 220) {
-        return {
-          title: '王牌飞行员',
-          subtitle: '反应敏捷，具备极高的瞬时判断力。',
-          color: '#10B981', // Green
-          shadowColor: 'rgba(16, 185, 129, 0.6)',
-          badgeBg: 'rgba(16, 185, 129, 0.1)',
-          isGlitch: false
-        };
-      }
-      
-      // Case C: 220ms - 300ms (Ordinary)
-      if (ms <= 300) {
-        return {
-          title: '普通路人',
-          subtitle: '标准的生理机能，属于大多数人的基准水平。',
-          color: '#F59E0B', // Yellow/Orange
-          shadowColor: 'rgba(245, 158, 11, 0.6)',
-          badgeBg: 'rgba(245, 158, 11, 0.1)',
-          isGlitch: false
-        };
-      }
-      
-      // Case D: > 300ms (Severe Lag)
+      // Case D: Risk (Severe Lag)
+      if (ms >= risk) {
           return {
             title: '严重迟滞',
             subtitle: '警报：前额叶活跃度显著降低，反应链出现物理阻滞。',
@@ -181,6 +162,17 @@ export default {
             badgeBg: 'rgba(255, 59, 48, 0.1)',
             isGlitch: false
           };
+      }
+      
+      // Case B: Ordinary
+      return {
+          title: '普通路人',
+          subtitle: '标准的生理机能，属于大多数人的基准水平。',
+          color: '#F59E0B', // Yellow/Orange
+          shadowColor: 'rgba(245, 158, 11, 0.6)',
+          badgeBg: 'rgba(245, 158, 11, 0.1)',
+          isGlitch: false
+      };
     },
     progressPercent() {
       // Map 0ms -> 0%, 500ms -> 100%
@@ -285,7 +277,6 @@ export default {
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
 
-    // Get Menu Button (Capsule) Info for Alignment
     // #ifdef MP-WEIXIN
     const menuButton = uni.getMenuButtonBoundingClientRect();
     this.menuButtonTop = menuButton.top;
@@ -299,30 +290,51 @@ export default {
     this.navPaddingBottom = 4;
     // #endif
     
-    if (options.time) {
-      this.reactionTime = parseInt(options.time) || 0;
-    }
-    
-    // Robust check for reactionTimes (handle case sensitivity)
-    const timesStr = options.reactionTimes || options.reactiontimes;
-    if (timesStr) {
+    // Parse 'data' payload if available (New Standard)
+    let metrics = {};
+    if (options.data) {
       try {
-        // Handle encoded URI component if needed (though usually auto-decoded)
-        const decodedStr = decodeURIComponent(timesStr);
-        this.reactionTimes = decodedStr.split(',').map(Number).filter(n => !isNaN(n));
+        const payload = JSON.parse(decodeURIComponent(options.data));
+        if (payload.metrics) metrics = payload.metrics;
+        if (payload.thresholds) this.thresholds = payload.thresholds;
+        
+        // Legacy Support inside data payload
+        if (payload.reactionTimes && !payload.metrics) {
+           metrics.reactionTimes = payload.reactionTimes;
+           metrics.falseStarts = payload.falseStartCount;
+        }
       } catch (e) {
-        console.error('Error parsing reactionTimes:', e);
-        this.reactionTimes = [];
+        console.error('Error parsing data payload:', e);
+      }
+    }
+
+    // Assign Metrics
+    if (metrics.reactionTimes) {
+      this.reactionTimes = metrics.reactionTimes;
+      this.falseStartCount = metrics.falseStarts || 0;
+      this.reactionTime = metrics.averageMs || 0;
+    } else {
+      // Legacy Query Params Support
+      if (options.time) {
+        this.reactionTime = parseInt(options.time) || 0;
+      }
+      const timesStr = options.reactionTimes || options.reactiontimes;
+      if (timesStr) {
+        try {
+          const decodedStr = decodeURIComponent(timesStr);
+          this.reactionTimes = decodedStr.split(',').map(Number).filter(n => !isNaN(n));
+        } catch (e) {
+          this.reactionTimes = [];
+        }
+      }
+      if (options.falseStarts) {
+        this.falseStartCount = parseInt(options.falseStarts) || 0;
       }
     }
     
-    if (options.falseStarts) {
-      this.falseStartCount = parseInt(options.falseStarts) || 0;
-    }
-    
-    // Fallback if only single time available
-    if (this.reactionTimes.length === 0 && this.reactionTime > 0) {
-      this.reactionTimes = [this.reactionTime];
+    // Fallback calculation if average not provided
+    if (this.reactionTime === 0 && this.reactionTimes.length > 0) {
+      this.reactionTime = Math.round(this.reactionTimes.reduce((a, b) => a + b, 0) / this.reactionTimes.length);
     }
     
     console.log('Final reactionTimes for analysis:', this.reactionTimes);
