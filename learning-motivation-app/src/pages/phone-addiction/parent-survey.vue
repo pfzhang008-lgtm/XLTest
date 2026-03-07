@@ -1,469 +1,565 @@
 <template>
-  <view class="container theme-neuro-sync">
+  <view class="container">
     <!-- Navbar -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="back-btn" @click="goBack">
+    <view class="custom-nav" :style="{ paddingTop: menuButtonTop + 'px', paddingBottom: navPaddingBottom + 'px' }">
+      <view class="nav-back" :style="{ height: menuButtonHeight + 'px', width: menuButtonHeight + 'px' }" @click="goBack">
         <text class="back-arrow">←</text>
       </view>
-      <text class="nav-title">家长观察问卷 (升级版)</text>
+      <text class="nav-title">家长观察问卷</text>
     </view>
 
-    <!-- Main Content Area -->
-    <view class="content-area">
+    <!-- Content Area -->
+    <view class="content-area" :style="{ paddingTop: contentPaddingTop + 'px' }">
       
-      <!-- Progress Header -->
-      <view class="progress-header fade-in">
-        <text class="progress-label">[系统诊断中]</text>
-        <text class="progress-value">进度: <text class="cyan-text">{{ currentQuestionIndex + 1 }}</text>/{{ totalQuestions }}</text>
-        <view class="progress-bar-bg">
-          <view class="progress-bar-fill" :style="{ width: progressPercent + '%' }"></view>
+      <!-- Step 1: Age Selection (REMOVED - Auto-detected from profile) -->
+      <!-- 
+      <view v-if="currentStep === 'age'" class="age-selection">
+         ... code removed ...
+      </view>
+      -->
+
+      <!-- Step 2: Survey Questions -->
+      <view v-if="currentStep === 'survey'" class="survey-container">
+        <!-- Progress Bar -->
+        <view class="progress-header">
+          <text class="progress-text">问题 {{ currentQuestionIndex + 1 }} / {{ questions.length }}</text>
+          <view class="progress-track">
+            <view class="progress-fill" :style="{ width: progressPercentage + '%' }"></view>
+          </view>
+        </view>
+
+        <!-- Question Card -->
+        <view class="question-card glass-card">
+          <view class="question-header">
+            <text class="question-tag">{{ currentQuestion.dimension }}</text>
+          </view>
+          <text class="question-text">{{ currentQuestion.text }}</text>
+        </view>
+
+        <!-- Options List -->
+        <view class="options-list">
+          <view 
+            class="option-item glass-card" 
+            v-for="(option, index) in currentQuestion.options" 
+            :key="index"
+            hover-class="option-hover"
+            @click="selectOption(option)"
+          >
+            <view class="option-content">
+              <text class="option-label">{{ option.label }}</text>
+            </view>
+            <view class="option-radio">
+              <view class="radio-inner"></view>
+            </view>
+          </view>
         </view>
       </view>
 
-      <!-- Question Card (Transition Wrapper) -->
-      <view class="card-container">
-        <transition name="slide" mode="out-in">
-          <view :key="currentQuestion.id" class="question-card glass-panel" v-if="currentQuestion.id">
-            <view class="question-header">
-              <text class="question-id">Q{{ currentQuestionIndex + 1 }}</text>
-              <view class="question-decoration"></view>
-            </view>
-            
-            <text class="question-text">{{ currentQuestion.text }}</text>
-            
-            <view class="options-list">
-              <view 
-                v-for="(option, index) in currentQuestion.options" 
-                :key="option.id"
-                class="option-item"
-                :class="{ 'option-active': selectedOptionId === option.id }"
-                @click="handleSelect(option)"
-                hover-class="option-hover"
-                :hover-stay-time="100"
-              >
-                <view class="option-marker">
-                  <text class="option-letter">{{ option.id }}</text>
-                </view>
-                <text class="option-text">{{ option.text }}</text>
-                <view v-if="selectedOptionId === option.id" class="option-glow"></view>
-              </view>
-            </view>
+      <!-- Step 3: Handover -->
+      <view v-if="currentStep === 'handover'" class="handover-container">
+        <view class="handover-content">
+          <image class="handover-icon" :src="icons.handover" mode="aspectFit"></image>
+          <text class="handover-title">家长部分已完成</text>
+          <text class="handover-desc">
+            接下来的测试需要由<text class="highlight">孩子独立完成</text>。
+            请确保环境安静，不要打扰或提示孩子。
+            测试结果将结合您的问卷生成最终报告。
+          </text>
+          
+          <view class="device-instruction">
+            <text class="instruction-text">请将设备移交给受测者</text>
+            <view class="pulse-circle"></view>
           </view>
-          <view v-else class="error-state">
-            <text class="error-text">题目加载失败，请检查数据源</text>
-            <text class="debug-info">Total: {{ totalQuestions }}</text>
-          </view>
-        </transition>
+        </view>
+
+        <button class="start-test-btn" hover-class="btn-hover" @click="startChildTest">
+          <text>我是受测者，开始测试</text>
+          <view class="btn-glow"></view>
+        </button>
       </view>
+
     </view>
   </view>
 </template>
 
-<script setup>
-import { ref, computed, onMounted } from 'vue';
+<script>
 import surveyData from '../../data/survey_esports.json';
+import mod01Config from '../../data/config_mod01.json';
 
-// State
-const statusBarHeight = ref(20);
-// Extract questions array from the new JSON structure
-const questions = ref([]); 
-const currentQuestionIndex = ref(0);
-const answers = ref({});
-const selectedOptionId = ref(null);
-const isTransitioning = ref(false);
-
-// Computed
-const totalQuestions = computed(() => questions.value.length);
-const currentQuestion = computed(() => questions.value[currentQuestionIndex.value] || {});
-const progressPercent = computed(() => {
-  if (totalQuestions.value === 0) return 0;
-  return ((currentQuestionIndex.value + 1) / totalQuestions.value) * 100;
-});
-
-// Lifecycle
-onMounted(() => {
-  console.log('[ParentSurvey] onMounted started');
-  const sysInfo = uni.getSystemInfoSync();
-  statusBarHeight.value = sysInfo.statusBarHeight || 20;
-  
-  // Data Loading with detailed logging
-  console.log('[ParentSurvey] Raw surveyData:', surveyData);
-  if (surveyData && surveyData.questions) {
-    questions.value = surveyData.questions;
-    console.log('[ParentSurvey] Questions loaded:', questions.value.length);
-  } else {
-    console.error('[ParentSurvey] Invalid surveyData structure');
-    // Fallback/Mock data if json fails
-    questions.value = [
-      {
-        "id": "q1",
-        "text": "数据加载异常，这是备用题目：孩子是否在无法玩游戏时表现出烦躁？",
-        "options": [
-          { "id": "A", "type": "NORMAL", "text": "从不" },
-          { "id": "B", "type": "PATHOLOGY", "text": "经常" }
-        ]
+export default {
+  data() {
+    return {
+      moduleId: '01',
+      statusBarHeight: 20,
+      menuButtonTop: 24,
+      menuButtonHeight: 32,
+      navPaddingBottom: 8,
+      contentPaddingTop: 100,
+      
+      currentStep: 'loading', // loading, survey, handover
+      ageGroup: '', // low_age, high_age
+      questions: [],
+      currentQuestionIndex: 0,
+      answers: {},
+      totalScore: 0,
+      
+      // Embedded SVGs for icons
+      icons: {
+        handover: '../../static/icons/handover.png'
       }
-    ];
-  }
-});
-
-// Methods
-const goBack = () => {
-  uni.navigateBack();
-};
-
-const handleSelect = (option) => {
-  if (isTransitioning.value) return;
-  
-  console.log('[Interaction] Option selected:', option.id, option.type);
-  
-  // 1. Visual Feedback
-  selectedOptionId.value = option.id;
-  isTransitioning.value = true;
-  
-  // Record Answer
-  answers.value[currentQuestion.value.id] = option.type;
-  
-  // Haptic Feedback
-  uni.vibrateShort();
-
-  // 2. Delay for Animation
-  setTimeout(() => {
-    if (currentQuestionIndex.value < totalQuestions.value - 1) {
-      // Next Question
-      currentQuestionIndex.value++;
-      selectedOptionId.value = null;
-      isTransitioning.value = false;
-    } else {
-      // Finish immediately
-      finishSurvey();
+    };
+  },
+  computed: {
+    currentQuestion() {
+      return this.questions[this.currentQuestionIndex] || {};
+    },
+    progressPercentage() {
+      if (this.questions.length === 0) return 0;
+      return ((this.currentQuestionIndex + 1) / this.questions.length) * 100;
     }
-  }, 300); 
-};
+  },
+  onLoad(options) {
+    if (options && options.moduleId) {
+      this.moduleId = options.moduleId;
+    }
+    
+    const sysInfo = uni.getSystemInfoSync();
+    this.statusBarHeight = sysInfo.statusBarHeight || 20;
 
-const finishSurvey = () => {
-  console.log('[ParentSurvey] Survey finished. Answers:', answers.value);
-  uni.showToast({
-    title: '评估完成',
-    icon: 'success',
-    duration: 1500
-  });
-  
-  setTimeout(() => {
-    uni.navigateBack();
-  }, 1500);
+    // #ifdef MP-WEIXIN
+    const menuButton = uni.getMenuButtonBoundingClientRect();
+    this.menuButtonTop = menuButton.top;
+    this.menuButtonHeight = menuButton.height;
+    this.navPaddingBottom = menuButton.top - this.statusBarHeight;
+    if (this.navPaddingBottom < 4) this.navPaddingBottom = 4;
+    // #endif
+    // #ifndef MP-WEIXIN
+    this.menuButtonTop = this.statusBarHeight + 4;
+    this.menuButtonHeight = 32;
+    this.navPaddingBottom = 4;
+    // #endif
+
+    this.contentPaddingTop = this.menuButtonTop + this.menuButtonHeight + this.navPaddingBottom + 20;
+    
+    // Load User Profile for Age
+    const userProfile = uni.getStorageSync('user_profile');
+    console.log('[ParentSurvey] Loading profile:', userProfile);
+    
+    if (userProfile && userProfile.age) {
+      const age = parseInt(userProfile.age);
+      this.ageGroup = age <= 12 ? 'low_age' : 'high_age';
+      console.log(`[ParentSurvey] Auto-detected age group: ${this.ageGroup} (Age: ${age})`);
+      
+      // Load questions immediately
+      this.loadQuestions(this.ageGroup);
+    } else {
+      console.warn('[ParentSurvey] Profile missing or invalid age. Redirecting to calibration.');
+      uni.showToast({
+        title: '需完善基础档案',
+        icon: 'none'
+      });
+      setTimeout(() => {
+        uni.navigateTo({ url: '/pages/onboarding/calibration' });
+      }, 1500);
+    }
+  },
+  methods: {
+    loadQuestions(group) {
+      if (surveyData.versions && surveyData.versions[group]) {
+        this.questions = surveyData.versions[group].questions;
+        this.currentStep = 'survey';
+        this.currentQuestionIndex = 0;
+      } else {
+        console.error('Survey data not found for group:', group);
+        uni.showToast({ title: '数据加载错误', icon: 'none' });
+      }
+    },
+    goBack() {
+      if (this.currentStep === 'survey') {
+        // Confirm exit if in survey
+        uni.showModal({
+          title: '退出问卷？',
+          content: '当前进度将丢失，确定要返回吗？',
+          success: (res) => {
+            if (res.confirm) {
+              uni.navigateBack();
+            }
+          }
+        });
+      } else if (this.currentStep === 'handover') {
+         // Handover state - prevent back simply
+         uni.showToast({ title: '请开始测试', icon: 'none' });
+      } else {
+        uni.navigateBack();
+      }
+    },
+    // selectAge method removed - age is auto-detected
+    selectOption(option) {
+      console.log('Selected option:', option);
+      // Record answer
+      const qId = this.currentQuestion.id;
+      // Store complete option info for report
+      this.answers[qId] = {
+        score: option.score,
+        label: option.label,
+        dimension: this.currentQuestion.dimension
+      };
+      this.totalScore += option.score;
+
+      // Next Question or Finish
+      if (this.currentQuestionIndex < this.questions.length - 1) {
+        setTimeout(() => {
+          this.currentQuestionIndex++;
+        }, 200); // Slight delay for visual feedback
+      } else {
+        this.finishSurvey();
+      }
+    },
+    finishSurvey() {
+      console.log('Survey finished. Total score:', this.totalScore);
+      
+      // Save results locally
+      const resultData = {
+        moduleId: this.moduleId,
+        surveyId: surveyData.surveyId,
+        ageGroup: this.ageGroup,
+        answers: this.answers,
+        totalScore: this.totalScore,
+        timestamp: new Date().getTime()
+      };
+      
+      uni.setStorageSync('parent_survey_result', resultData); // Legacy support
+      uni.setStorageSync('module_' + this.moduleId + '_survey_data', resultData); // New standard for reset
+
+
+      // Move to handover step
+      this.currentStep = 'handover';
+    },
+    startChildTest() {
+      console.log('Starting child test sequence...');
+      
+      // Cache completion status
+      uni.setStorageSync('module_' + this.moduleId + '_survey_completed', true);
+      
+      // Initialize module state
+      uni.setStorageSync('current_module_id', this.moduleId);
+      uni.setStorageSync('current_test_step', 0);
+      
+      uni.showToast({
+        title: '问卷已完成',
+        icon: 'success',
+        duration: 1500
+      });
+
+      // Navigate back to Briefing Page to continue flow
+      setTimeout(() => {
+        uni.navigateBack();
+      }, 1500);
+    }
+  }
 };
 </script>
 
-<style scoped>
-/* Theme: NEURO_SYNC (Dark Slate + Cyan) */
-.theme-neuro-sync {
-  background-color: #0f172a; /* Dark Slate */
-  color: #e2e8f0; /* Light Slate */
-  font-family: 'Inter', sans-serif;
-}
-
+<style>
+/* Base Layout */
 .container {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
+  background-color: #050505; /* Deep Black Background */
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
 }
 
 /* Navbar */
-.nav-bar {
+.custom-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  background: rgba(5, 5, 5, 0.8);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
-  padding: 10px 16px;
-  background-color: rgba(15, 23, 42, 0.95);
-  backdrop-filter: blur(10px);
-  z-index: 100;
-  border-bottom: 1px solid rgba(34, 211, 238, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.back-btn {
-  width: 70rpx;
-  height: 70rpx;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
+.nav-back {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 16px;
+  margin-left: 16px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .back-arrow {
   color: #fff;
-  font-size: 40rpx;
+  font-size: 18px;
   font-weight: bold;
-  line-height: 1;
 }
 
 .nav-title {
-  font-size: 32rpx;
+  margin-left: 16px;
+  font-size: 16px;
   font-weight: 600;
-  letter-spacing: 1px;
   color: #fff;
 }
 
 /* Content Area */
 .content-area {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 24px;
-  position: relative;
+  padding-left: 20px;
+  padding-right: 20px;
+  padding-bottom: 40px;
 }
 
-/* Progress Header */
+/* Section Titles */
+.section-title {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.section-subtitle {
+  display: block;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 30px;
+}
+
+/* Glass Card Style */
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+/* Survey Container */
 .progress-header {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
-.progress-label {
-  font-size: 24rpx;
-  color: #64748b;
-  letter-spacing: 2px;
+.progress-text {
+  font-size: 12px;
+  color: rgba(37, 244, 244, 0.8);
+  margin-bottom: 8px;
   display: block;
-  margin-bottom: 4px;
 }
 
-.progress-value {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #94a3b8;
-  display: block;
-  margin-bottom: 12px;
-}
-
-.cyan-text {
-  color: #22d3ee;
-}
-
-.progress-bar-bg {
+.progress-track {
+  width: 100%;
   height: 4px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
   overflow: hidden;
 }
 
-.progress-bar-fill {
+.progress-fill {
   height: 100%;
-  background: #22d3ee;
-  box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+  background: #25f4f4;
   transition: width 0.3s ease;
-}
-
-/* Card Container */
-.card-container {
-  flex: 1;
-  display: flex;
-  align-items: flex-start; /* Changed from center to flex-start to utilize top space */
-  justify-content: center;
-  position: relative;
-  width: 100%;
-  padding: 0 16px 32px 16px; /* Added bottom padding */
-  box-sizing: border-box;
+  box-shadow: 0 0 8px rgba(37, 244, 244, 0.5);
 }
 
 .question-card {
-  width: 100%;
-  min-height: 60vh; /* Ensure card takes up significant vertical space */
-  background: rgba(30, 41, 59, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  border-radius: 24px;
-  padding: 32px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  margin: 0 auto;
-  box-sizing: border-box;
+  padding: 24px;
+  margin-bottom: 24px;
+  min-height: 120px;
   display: flex;
   flex-direction: column;
-}
-
-.question-text {
-  font-size: 36rpx; /* Increased font size */
-  font-weight: 600;
-  line-height: 1.6;
-  margin-bottom: 48px; /* Increased spacing */
-  color: #fff;
-  flex: 1; /* Allow text area to expand */
-}
-
-.glass-panel {
-  /* Additional glass effect if needed */
 }
 
 .question-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
-.question-id {
-  font-size: 48rpx;
-  font-weight: 800;
-  color: rgba(255, 255, 255, 0.1);
-  font-family: monospace;
-}
-
-.question-decoration {
-  width: 40px;
-  height: 2px;
-  background: #22d3ee;
-  box-shadow: 0 0 8px #22d3ee;
+.question-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(37, 244, 244, 0.1);
+  border: 1px solid rgba(37, 244, 244, 0.3);
+  color: #25f4f4;
+  font-size: 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
 
 .question-text {
-  font-size: 36rpx;
-  font-weight: 600;
+  font-size: 18px;
   line-height: 1.5;
+  font-weight: 500;
   color: #fff;
-  margin-bottom: 40px;
-  display: block;
 }
 
-/* Options */
 .options-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .option-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
   padding: 16px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
 }
 
 .option-hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(37, 244, 244, 0.05);
+  border-color: rgba(37, 244, 244, 0.3);
 }
 
-.option-active {
-  background: rgba(34, 211, 238, 0.1);
-  border-color: #22d3ee;
-  box-shadow: 0 0 15px rgba(34, 211, 238, 0.2);
-}
-
-.option-marker {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 16px;
-  font-weight: 700;
-  font-size: 24rpx;
-  color: #94a3b8;
-}
-
-.option-active .option-marker {
-  background: #22d3ee;
-  color: #0f172a;
-}
-
-.option-text {
-  font-size: 28rpx;
-  color: #cbd5e1;
-}
-
-.option-active .option-text {
-  color: #fff;
-  font-weight: 500;
-}
-
-.option-glow {
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
-  background: radial-gradient(circle at center, rgba(34, 211, 238, 0.1) 0%, transparent 70%);
-  pointer-events: none;
-}
-
-/* Transitions */
-.slide-enter-active,
-.slide-leave-active {
-  transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-.slide-enter-from {
-  opacity: 0;
-  transform: translateX(100rpx) scale(0.95);
-}
-
-.slide-leave-to {
-  opacity: 0;
-  transform: translateX(-100rpx) scale(0.95);
-}
-
-/* Loading Screen */
-.loading-screen {
+.option-content {
   flex: 1;
+  padding-right: 16px;
+}
+
+.option-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.4;
+}
+
+.option-radio {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.loading-content {
-  text-align: center;
+.option-hover .option-radio {
+  border-color: #25f4f4;
+}
+
+/* Handover Screen */
+.handover-container {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  padding-top: 40px;
 }
 
-.loader-glitch {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 32px;
+.handover-content {
+  text-align: center;
+  margin-bottom: 60px;
 }
 
-.glitch-box {
-  width: 12px;
-  height: 12px;
-  background: #22d3ee;
-  animation: pulse 1s infinite alternate;
+.handover-icon {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 24px;
+  /* Placeholder if image fails */
+  background: rgba(255, 255, 255, 0.05); 
+  border-radius: 50%;
 }
 
-.glitch-box:nth-child(2) { animation-delay: 0.2s; }
-.glitch-box:nth-child(3) { animation-delay: 0.4s; }
-
-.loading-text {
-  font-size: 32rpx;
+.handover-title {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
   color: #fff;
+  margin-bottom: 16px;
+}
+
+.handover-desc {
+  display: block;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
+  max-width: 280px;
+  margin: 0 auto 30px;
+}
+
+.highlight {
+  color: #25f4f4;
   font-weight: 600;
-  margin-bottom: 8px;
-  min-height: 48rpx; /* Prevent layout shift */
 }
 
-.loading-sub {
-  font-size: 24rpx;
-  color: #22d3ee;
-  letter-spacing: 2px;
-  opacity: 0.7;
+.device-instruction {
+  position: relative;
+  display: inline-block;
+  padding: 12px 24px;
+  background: rgba(37, 244, 244, 0.05);
+  border: 1px solid rgba(37, 244, 244, 0.3);
+  border-radius: 30px;
 }
 
-.fade-in {
-  animation: fadeIn 0.5s ease;
+.instruction-text {
+  font-size: 14px;
+  color: #25f4f4;
+  letter-spacing: 1px;
+}
+
+.pulse-circle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  border-radius: 30px;
+  border: 1px solid #25f4f4;
+  animation: pulse 2s infinite;
+  opacity: 0;
 }
 
 @keyframes pulse {
-  0% { opacity: 0.3; transform: scale(0.8); }
-  100% { opacity: 1; transform: scale(1); box-shadow: 0 0 10px #22d3ee; }
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0;
+  }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.start-test-btn {
+  width: 100%;
+  height: 56px;
+  background: linear-gradient(90deg, #25f4f4, #00c3ff);
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  border: none;
+}
+
+.start-test-btn text {
+  font-size: 18px;
+  font-weight: 600;
+  color: #000;
+  z-index: 1;
+}
+
+.btn-glow {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shine 3s infinite;
+}
+
+@keyframes shine {
+  0% { left: -100%; }
+  20% { left: 100%; }
+  100% { left: 100%; }
+}
+
+.btn-hover {
+  transform: scale(0.98);
+  opacity: 0.9;
 }
 </style>

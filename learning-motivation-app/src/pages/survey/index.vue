@@ -22,12 +22,18 @@ import surveyEsports from '@/data/survey_esports.json';
 import surveyVideoFog from '@/data/survey_video_fog.json';
 import surveyAcademic from '@/data/survey_academic_focus.json';
 import surveyMindset from '@/data/survey_study_mindset.json';
+import surveyExam from '@/data/survey_exam_anxiety.json';
 
 const currentSurveyData = ref(null);
 const surveyType = ref('');
+const moduleId = ref('');
 
 onLoad((options) => {
   console.log('[SurveyPage] onLoad with options:', options);
+  if (options.moduleId) {
+    moduleId.value = options.moduleId;
+  }
+  
   if (options.type) {
     surveyType.value = options.type;
     loadSurveyData(options.type);
@@ -43,18 +49,22 @@ onLoad((options) => {
 });
 
 const loadSurveyData = (type) => {
+  let rawData = null;
   switch (type) {
     case 'esports':
-      currentSurveyData.value = surveyEsports;
+      rawData = surveyEsports;
       break;
     case 'videofog':
-      currentSurveyData.value = surveyVideoFog;
+      rawData = surveyVideoFog;
       break;
     case 'academic':
-      currentSurveyData.value = surveyAcademic;
+      rawData = surveyAcademic;
       break;
     case 'mindset':
-      currentSurveyData.value = surveyMindset;
+      rawData = surveyMindset;
+      break;
+    case 'exam':
+      rawData = surveyExam;
       break;
     default:
       console.error('Unknown survey type:', type);
@@ -63,6 +73,47 @@ const loadSurveyData = (type) => {
         icon: 'none'
       });
       setTimeout(() => uni.navigateBack(), 1500);
+      return;
+  }
+
+  if (rawData) {
+    let finalData = null;
+    // Check for age-specific versions
+    if (rawData.versions) {
+      const userProfile = uni.getStorageSync('user_profile') || {};
+      const age = userProfile.age ? parseInt(userProfile.age) : 12; // Default to 12 (low_age) if not set
+      
+      const versionKey = age <= 12 ? 'low_age' : 'high_age';
+      const versionData = rawData.versions[versionKey];
+      
+      console.log(`[SurveyPage] Loading ${versionKey} version for age ${age}`);
+
+      // Merge root properties with version data to flatten structure
+      finalData = {
+        ...rawData,
+        ...versionData
+      };
+    } else {
+      // Direct assignment if no versions (backward compatibility)
+      finalData = rawData;
+    }
+
+    // NORMALIZE DATA (Fix field mismatches: label->text, score->type, add id)
+    // ClinicalQuestionnaireEngine expects: options: [{ id: 'A', text: '...', type: 3 }]
+    // JSON provides: options: [{ label: '...', score: 3 }]
+    if (finalData && finalData.questions) {
+      finalData.questions = finalData.questions.map(q => ({
+        ...q,
+        options: q.options.map((opt, idx) => ({
+          ...opt,
+          id: opt.id || String.fromCharCode(65 + idx), // Auto-generate A, B, C...
+          text: opt.text || opt.label, // Map label to text
+          type: opt.type !== undefined ? opt.type : opt.score // Map score to type (value)
+        }))
+      }));
+    }
+
+    currentSurveyData.value = finalData;
   }
 };
 
@@ -71,29 +122,35 @@ const handleFinish = (answers) => {
   
   // Encode answers to pass to result page
   // Note: For large payloads, consider using uni.setStorage or a global store.
-  // URL length limits might be an issue if answers are very long, but here they are short keys.
   const payload = JSON.stringify(answers);
+
+  // Cache completion status
+  let targetModuleId = moduleId.value;
   
-  // Navigate to result page (Assuming result page exists or will be created)
-  // User said "ResultPage (which we will build next)"
-  // So for now, we'll log it and maybe show a toast or navigate to a placeholder.
-  // I'll navigate to a generic result page or back for now, as I don't have the result page path yet.
-  // Or better, I'll navigate to `pages/report/index?data=...` assuming that's the next step.
-  // But since the user said "which we will build next", I should probably just show a success message 
-  // and maybe navigate back or to a temporary success page.
-  
-  // Actually, let's navigate to a result page with the type and data.
-  // Using encodeURIComponent to be safe.
-  uni.navigateTo({
-    url: `/pages/report/index?type=${surveyType.value}&data=${encodeURIComponent(payload)}`,
-    fail: (err) => {
-      console.error('Navigation failed, maybe page does not exist yet:', err);
-      uni.showToast({
-        title: '测评完成 (结果页待开发)',
-        icon: 'success'
-      });
+  if (!targetModuleId) {
+    switch(surveyType.value) {
+        case 'videofog': targetModuleId = '02'; break;
+        case 'academic': targetModuleId = '03'; break;
+        case 'mindset': targetModuleId = '05'; break;
+        case 'exam': targetModuleId = '04'; break;
     }
+  }
+  
+  if (targetModuleId) {
+    uni.setStorageSync('module_' + targetModuleId + '_survey_completed', true);
+    uni.setStorageSync('module_' + targetModuleId + '_survey_data', answers);
+  }
+  
+  // Navigate back to the landing page to start the objective assessment
+  uni.showToast({
+    title: '主诉建档完成',
+    icon: 'success',
+    duration: 1500
   });
+  
+  setTimeout(() => {
+    uni.navigateBack();
+  }, 1500);
 };
 
 const handleBack = () => {

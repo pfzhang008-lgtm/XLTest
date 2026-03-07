@@ -15,9 +15,9 @@
       }
     },
     {
-      "path": "pages/phone-addiction/index",
+      "path": "pages/assessment/briefing",
       "style": {
-        "navigationBarTitleText": "电竞天赋评估",
+        "navigationBarTitleText": "评估流程说明",
         "navigationStyle": "custom"
       }
     },
@@ -50,6 +50,13 @@
       }
     },
     {
+      "path": "pages/report/index",
+      "style": {
+        "navigationBarTitleText": "综合评估报告",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/neural-link/PVT",
       "style": {
         "navigationBarTitleText": "PVT 视动反应测试",
@@ -57,23 +64,16 @@
       }
     },
     {
-      "path": "pages/neural-link/PVT-result",
+      "path": "pages/neural-link/result",
       "style": {
         "navigationBarTitleText": "测试结果",
         "navigationStyle": "custom"
       }
     },
     {
-      "path": "pages/neural-link/test2",
+      "path": "pages/neural-link/grid",
       "style": {
         "navigationBarTitleText": "视觉专注测试",
-        "navigationStyle": "custom"
-      }
-    },
-    {
-      "path": "pages/neural-link/test2-result",
-      "style": {
-        "navigationBarTitleText": "认知钝化诊断报告",
         "navigationStyle": "custom"
       }
     },
@@ -85,13 +85,6 @@
       }
     },
     {
-      "path": "pages/neural-link/Stroop-result",
-      "style": {
-        "navigationBarTitleText": "大脑年龄诊断",
-        "navigationStyle": "custom"
-      }
-    },
-    {
       "path": "pages/neural-link/nback",
       "style": {
         "navigationBarTitleText": "记忆锚点追踪",
@@ -99,51 +92,9 @@
       }
     },
     {
-      "path": "pages/neural-link/nback-result",
-      "style": {
-        "navigationBarTitleText": "N-Back 深度扫描报告",
-        "navigationStyle": "custom"
-      }
-    },
-    {
       "path": "pages/neural-link/sart",
       "style": {
-        "navigationBarTitleText": "雷达哨兵测试",
-        "navigationStyle": "custom"
-      }
-    },
-    {
-      "path": "pages/neural-link/sart-result",
-      "style": {
-        "navigationBarTitleText": "SART 诊断报告",
-        "navigationStyle": "custom"
-      }
-    },
-    {
-      "path": "pages/exam-anxiety/ExamAnxiety",
-      "style": {
-        "navigationBarTitleText": "考前焦虑心魔扫描",
-        "navigationStyle": "custom"
-      }
-    },
-    {
-      "path": "pages/video_fog/index",
-      "style": {
-        "navigationBarTitleText": "短视频脑雾检测",
-        "navigationStyle": "custom"
-      }
-    },
-    {
-      "path": "pages/academic_focus/index",
-      "style": {
-        "navigationBarTitleText": "学业专注力体检",
-        "navigationStyle": "custom"
-      }
-    },
-    {
-      "path": "pages/study_mindset/index",
-      "style": {
-        "navigationBarTitleText": "学习心态扫描",
+        "navigationBarTitleText": "持续注意力反应测试",
         "navigationStyle": "custom"
       }
     }

@@ -71,15 +71,26 @@
         <view v-for="n in 5" :key="n" class="noise-bar" :style="{ height: getRandomHeight(n) + 'rpx' }"></view>
       </view>
     </view>
+    
+    <!-- Countdown Overlay -->
+    <CountdownOverlay 
+      v-if="showCountdown" 
+      @complete="handleCountdownComplete" 
+    />
   </view>
 </template>
 
 <script>
 import { getNormsByAge } from '@/utils/testConfigManager.js';
+import CountdownOverlay from '@/components/CountdownOverlay.vue';
 
 export default {
+  components: {
+    CountdownOverlay
+  },
   data() {
     return {
+      showCountdown: true,
       gridData: [],
       expectedNumber: 1,
       startTime: 0,
@@ -103,6 +114,7 @@ export default {
       currentFocusBlock: 0,
       FOCUS_THRESHOLD: 1500, // 1.5 seconds
       mode: '',
+      moduleId: '',
       config: null,
       excellentSec: 25,
       riskSec: 45
@@ -111,6 +123,9 @@ export default {
   onLoad(options) {
     if (options && options.mode) {
       this.mode = options.mode;
+    }
+    if (options && options.moduleId) {
+      this.moduleId = options.moduleId;
     }
     
     // Load config based on age
@@ -140,13 +155,18 @@ export default {
     // #endif
 
     this.initGrid();
-    this.startTimer();
-    this.startRandomEffects();
+    // this.startTimer();
+    // this.startRandomEffects();
   },
   onUnload() {
     this.clearTimers();
   },
   methods: {
+    handleCountdownComplete() {
+      this.showCountdown = false;
+      this.startTimer();
+      this.startRandomEffects();
+    },
     goBack() {
       uni.navigateBack();
     },
@@ -335,8 +355,19 @@ export default {
         }
       };
 
+      // Unified flow
+      const unifiedPayload = {
+          metrics: {
+              totalTime: totalDuration,
+              errors: this.errorCount,
+              avgFocus: avgFocus
+          }
+      };
+      
+      const targetModuleId = this.moduleId || '01'; // Default to 01 if missing
+
       uni.navigateTo({
-        url: `/pages/neural-link/test2-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}`
+          url: `/pages/neural-link/result?moduleId=${targetModuleId}&testType=Schulte&data=${encodeURIComponent(JSON.stringify(unifiedPayload))}`
       });
     },
     clearTimers() {

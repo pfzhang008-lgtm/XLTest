@@ -101,6 +101,21 @@ const handleCalibration = (data) => {
     }
   }, 1500);
 };
+
+// --- Reset Questionnaire Section ---
+const resetSurvey = (moduleId, title) => {
+  uni.showModal({
+    title: '重置问卷状态',
+    content: `确定要清除【${title}】的家长问卷记录吗？下次进入该模块需重新填写。`,
+    success: (res) => {
+      if (res.confirm) {
+        uni.removeStorageSync('module_' + moduleId + '_survey_completed');
+        uni.removeStorageSync('module_' + moduleId + '_survey_data');
+        uni.showToast({ title: '已重置', icon: 'success' });
+      }
+    }
+  });
+};
 </script>
 
 <style scoped>
@@ -136,4 +151,45 @@ const handleCalibration = (data) => {
   line-height: 1;
 }
 
+/* Reset Section Styles */
+.reset-section {
+  margin-top: 60rpx;
+  padding: 30rpx;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 16rpx;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #e2e8f0;
+  margin-bottom: 20rpx;
+  display: block;
+}
+
+.reset-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reset-item:last-child {
+  border-bottom: none;
+}
+
+.module-name {
+  font-size: 28rpx;
+  color: #94a3b8;
+}
+
+.reset-btn {
+  font-size: 24rpx;
+  color: #f42525;
+  background: rgba(244, 37, 37, 0.1);
+  padding: 10rpx 20rpx;
+  border-radius: 8rpx;
+}
 </style>

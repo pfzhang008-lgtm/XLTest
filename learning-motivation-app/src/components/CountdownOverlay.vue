@@ -1,6 +1,6 @@
 <template>
   <view class="overlay-container">
-    <view :style="{ transform: `translateY(${offsetY})` }">
+    <view class="countdown-wrapper">
       <text class="countdown-text" :class="{ 'pulse-anim': animate }">{{ displayValue }}</text>
     </view>
   </view>
@@ -61,20 +61,28 @@ onMounted(() => {
   height: 100%;
   z-index: 9999;
   background-color: rgba(15, 23, 42, 0.1);
-  backdrop-filter: blur(0px);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.countdown-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
 .countdown-text {
-  font-size: 200rpx;
-  font-weight: bold;
-  color: #00F2FF;
-  text-shadow: 0 0 40rpx rgba(0, 242, 255, 0.8);
+  font-size: 25vh;
+  line-height: 1;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.5);
+  text-shadow: none;
   font-family: 'Roboto Mono', monospace;
   opacity: 0;
-  transform: scale(0.5);
+  transform: scale(0.8);
 }
 
 .pulse-anim {
@@ -84,11 +92,11 @@ onMounted(() => {
 @keyframes pulse-entry {
   0% {
     opacity: 0;
-    transform: scale(0.5);
+    transform: scale(0.8);
   }
   50% {
     opacity: 1;
-    transform: scale(1.1);
+    transform: scale(1.05);
   }
   100% {
     opacity: 1;

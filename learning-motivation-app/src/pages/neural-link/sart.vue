@@ -1,14 +1,10 @@
 <template>
-  <view class="container" :class="{ 'glitch-active': feedback === 'false-alarm' }">
+  <view class="container">
     <!-- Background Elements -->
     <view class="radar-grid"></view>
     <view class="scan-line"></view>
     
-    <!-- Glitch Overlay -->
-    <view v-if="feedback === 'false-alarm'" class="glitch-overlay">
-      <text class="glitch-text" data-text="SYSTEM OVERRIDE">SYSTEM OVERRIDE</text>
-      <text class="glitch-sub">禁止操作信号</text>
-    </view>
+    <!-- Glitch Overlay Removed -->
 
     <!-- Header -->
     <view class="header">
@@ -45,7 +41,11 @@
       <view class="axis axis-y"></view>
       
       <!-- Sweeping Line -->
-      <view class="radar-sweep"></view>
+      <view 
+        class="radar-sweep"
+        :style="{ animationDuration: cycleDuration + 'ms', animationPlayState: isGameActive ? 'running' : 'paused' }"
+        :key="currentTrial"
+      ></view>
 
       <!-- Stimulus Display Area -->
       <view class="stimulus-container">
@@ -63,9 +63,14 @@
 
     <!-- Feedback Indicator (Center Bottom) -->
     <view class="feedback-area">
-      <text v-if="feedback === 'hit'" class="feedback-text text-green">目标捕获 [CAPTURED]</text>
-      <text v-if="feedback === 'miss'" class="feedback-text text-yellow">目标丢失 [MISSED]</text>
-      <text v-else class="feedback-text pvt-style-hint">数字不是<text class="text-cyan">3</text>时立即点击⬇️</text>
+      <view class="feedback-status-wrapper">
+        <text v-if="feedback === 'hit'" class="feedback-text text-green">目标捕获 [CAPTURED]</text>
+        <text v-else-if="feedback === 'miss'" class="feedback-text text-yellow">目标丢失 [MISSED]</text>
+        <text v-else-if="feedback === 'false-alarm'" class="feedback-text text-red">请勿点3 [MISTAKE]</text>
+      </view>
+      <view class="feedback-hint-wrapper">
+        <text class="feedback-text pvt-style-hint">数字不是<text class="text-cyan">3</text>时立即点击⬇️</text>
+      </view>
     </view>
 
     <!-- Interaction Area (Bottom) -->
@@ -113,18 +118,20 @@ const icons = {
 const config = ref(null);
 const maxTrials = ref(40);
 const stimulusDuration = ref(800);
+const intervalMs = ref(1500); // Default interval
 const nogoProb = ref(0.15);
-const MIN_ISI = 1200;
-const MAX_ISI = 2500;
+const moduleId = ref('01');
 
 const currentTrial = ref(0);
 const isGameActive = ref(false);
 const showCountdown = ref(true);
 const progressPercentage = computed(() => (currentTrial.value / maxTrials.value) * 100);
+const cycleDuration = computed(() => stimulusDuration.value + intervalMs.value);
 
 const currentStimulus = ref(null); // number | null
 const isVisible = ref(false);
 const hasActed = ref(false);
+const hasResponded = ref(false); // New: Track if user responded in current trial
 const feedback = ref(null); // 'hit' | 'miss' | 'false-alarm' | null
 const isPressed = ref(false);
 
@@ -141,17 +148,30 @@ const startTime = ref(0);
 
 // Timers
 let stimulusTimer = null;
-let isiTimer = null;
+const roundTimer = ref(null);
 let feedbackTimer = null;
 
 // --- Lifecycle ---
-onLoad(() => {
-  const userProfile = uni.getStorageSync('user_profile') || {};
-  const age = userProfile.age || 18;
+onLoad((options) => {
+  if (options && options.moduleId) {
+    moduleId.value = options.moduleId;
+  }
+  // Check if coming from parent survey
+  let age = 18;
+  const parentSurvey = uni.getStorageSync('parent_survey_result');
+  if (parentSurvey && parentSurvey.ageGroup) {
+    if (parentSurvey.ageGroup === 'low_age') age = 10;
+    else if (parentSurvey.ageGroup === 'high_age') age = 15;
+  } else {
+    const userProfile = uni.getStorageSync('user_profile') || {};
+    age = userProfile.age || 18;
+  }
+  
   config.value = getNormsByAge(age, 'sart');
   if (config.value) {
     maxTrials.value = config.value.totalTargets;
     stimulusDuration.value = config.value.displayMs;
+    intervalMs.value = config.value.intervalMs || 1500;
     nogoProb.value = config.value.nogoProb;
   }
 });
@@ -173,10 +193,9 @@ const goBack = () => {
 const startGame = () => {
   resetState();
   isGameActive.value = true;
-  startTime.value = Date.now();
   
   // Start first round
-  scheduleNextRound();
+  nextTrial();
 };
 
 const resetState = () => {
@@ -185,34 +204,27 @@ const resetState = () => {
   currentStimulus.value = null;
   isVisible.value = false;
   hasActed.value = false;
+  hasResponded.value = false;
   feedback.value = null;
 };
 
 const stopAllTimers = () => {
   clearTimeout(stimulusTimer);
-  clearTimeout(isiTimer);
+  if (roundTimer.value) clearTimeout(roundTimer.value);
   clearTimeout(feedbackTimer);
 };
 
-const scheduleNextRound = () => {
+const nextTrial = () => {
   if (currentTrial.value >= maxTrials.value) {
     endGame();
     return;
   }
-
-  const isi = Math.floor(Math.random() * (MAX_ISI - MIN_ISI + 1)) + MIN_ISI;
-  isiTimer = setTimeout(() => {
-    currentTrial.value++;
-    showStimulus();
-  }, isi);
-};
-
-const showStimulus = () => {
-  if (!isGameActive.value) return;
+  
+  // Increment trial
+  currentTrial.value++;
   
   // Determine Type: No-Go if random < nogoProb
   const isNoGo = Math.random() < nogoProb.value;
-  
   if (!isNoGo) {
     // Go Stimulus (Non-3)
     const nums = [0, 1, 2, 4, 5, 6, 7, 8, 9];
@@ -222,33 +234,52 @@ const showStimulus = () => {
     currentStimulus.value = 3;
   }
   
+  hasResponded.value = false; // Reset response flag
   isVisible.value = true;
   hasActed.value = false;
-  feedback.value = null; // Clear previous feedback
   
-  // Auto-hide after duration
-  stimulusTimer = setTimeout(() => {
-    hideStimulus();
-  }, stimulusDuration.value);
-};
-
-const hideStimulus = () => {
-  isVisible.value = false;
-  
-  // Check for Omission (Go target appeared, user did nothing)
-  if (currentStimulus.value !== 3 && !hasActed.value) {
-    metrics.value.omissions++;
-    metrics.value.events.push({ type: 'omission', timestamp: Date.now() - startTime.value });
-    feedback.value = 'miss'; 
-    clearFeedbackAfterDelay();
-  } else if (currentStimulus.value === 3 && !hasActed.value) {
-    metrics.value.correctRejections++;
+  // Only clear feedback if it wasn't a 'miss' (to let user see missed warning briefly)
+  // If it was 'miss', we keep it for a short duration or until user acts
+  if (feedback.value !== 'miss') {
+    feedback.value = null;
+  } else {
+    // Auto-clear miss feedback after 800ms so it doesn't persist too long
+    setTimeout(() => {
+      if (feedback.value === 'miss') {
+        feedback.value = null;
+      }
+    }, 800);
   }
   
-  currentStimulus.value = null;
+  const startT = Date.now();
+  startTime.value = startT;
   
-  if (isGameActive.value) {
-    scheduleNextRound();
+  // Timer 1: Visual Hide (displayMs) - purely visual
+  stimulusTimer = setTimeout(() => {
+    isVisible.value = false;
+  }, stimulusDuration.value);
+  
+  // Timer 2: Fixed Cycle Engine (displayMs + intervalMs)
+  // This is the ONLY place where nextTrial() is called recursively
+  roundTimer.value = setTimeout(() => {
+    // If user hasn't responded by the end of the cycle, check for omission
+    if (!hasResponded.value) {
+      handleMiss();
+    }
+    // Proceed to next trial ONLY after full cycle completes
+    nextTrial();
+  }, stimulusDuration.value + intervalMs.value);
+};
+
+const handleMiss = () => {
+  // Omission (Go target appeared, user did nothing)
+  if (currentStimulus.value !== 3) {
+    metrics.value.omissions++;
+    metrics.value.events.push({ type: 'omission', timestamp: 0 });
+    feedback.value = 'miss'; 
+  } else {
+    // Correct Rejection (No-Go target appeared, user did nothing)
+    metrics.value.correctRejections++;
   }
 };
 
@@ -256,11 +287,15 @@ const handleTap = () => {
   isPressed.value = true;
   if (!isGameActive.value) return;
   
-  if (!isVisible.value) return;
-  if (hasActed.value) return; // Prevent double taps
+  // If user has already responded in this trial, ignore subsequent taps
+  if (hasResponded.value) return;
+  hasResponded.value = true; // Mark as responded
   
+  // 1. Calculate reaction time
+  const reactionTime = Date.now() - startTime.value;
   hasActed.value = true;
   
+  // 2. Settlement
   if (currentStimulus.value !== 3) {
     // HIT (Correct) - Clicked on Non-3
     metrics.value.hits++;
@@ -268,24 +303,19 @@ const handleTap = () => {
   } else {
     // FALSE ALARM (Impulsivity) - Clicked on 3
     metrics.value.falseAlarms++;
-    metrics.value.events.push({ type: 'commission', timestamp: Date.now() - startTime.value });
+    metrics.value.events.push({ type: 'commission', timestamp: reactionTime });
     feedback.value = 'false-alarm';
     triggerPunishment();
   }
   
-  clearFeedbackAfterDelay();
+  // CRITICAL: DO NOT clear roundTimer! 
+  // DO NOT call nextTrial() here!
+  // Wait for the fixed cycle timer to trigger nextTrial()
 };
 
 const triggerPunishment = () => {
-  // Haptic
-  uni.vibrateShort();
-};
-
-const clearFeedbackAfterDelay = () => {
-  clearTimeout(feedbackTimer);
-  feedbackTimer = setTimeout(() => {
-    feedback.value = null;
-  }, 1000);
+  // Haptic removed per user request (no shake/vibration)
+  // uni.vibrateShort();
 };
 
 const endGame = () => {
@@ -312,7 +342,7 @@ const endGame = () => {
   setTimeout(() => {
     uni.hideLoading();
     uni.redirectTo({ 
-      url: `/pages/neural-link/sart-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}` 
+      url: `/pages/neural-link/result?moduleId=${moduleId.value}&testType=SART&data=${encodeURIComponent(JSON.stringify(resultPayload))}` 
     });
   }, 1500);
 };
@@ -433,19 +463,15 @@ const quitTest = () => {
 .axis-y { top: 0; left: 50%; width: 1px; height: 100%; }
 
 .radar-sweep {
-  position: absolute; top: 50%; left: 50%; width: 150px; height: 150px;
-  background: conic-gradient(from 0deg, transparent 270deg, rgba(239, 68, 68, 0.4));
-  transform-origin: top left;
-  animation: sweep 4s linear infinite;
-  border-radius: 0 0 150px 0; /* Quarter circle shape hack or just mask */
-  /* Better sweep implementation */
+  position: absolute; top: 50%; left: 50%; 
   width: 150px; height: 150px;
   background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.1));
   transform-origin: 0 0;
   animation: radar-spin 3s linear infinite;
   clip-path: polygon(0 0, 100% 0, 100% 100%);
+  border-radius: 0 0 150px 0;
 }
-@keyframes radar-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes radar-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
 
 .decor-label { position: absolute; font-size: 10px; color: #00f0ff; background: #0f1115; padding: 2px; }
 .top { top: -10px; } .bottom { bottom: -10px; } .left { left: -20px; top: 50%; } .right { right: -20px; top: 50%; }
@@ -473,10 +499,33 @@ const quitTest = () => {
 
 /* Feedback Area */
 .feedback-area {
-  text-align: center; height: 60px; display: flex; flex-direction: column; justify-content: center;
+  text-align: center;
+  height: 140rpx; /* Fixed height ~70px */
+  position: relative;
   margin-bottom: 20px;
+  /* Removed flex-direction column to use absolute positioning for stability */
 }
-.feedback-text { font-size: 16px; font-weight: bold; display: block; margin-bottom: 4px; }
+.feedback-status-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.feedback-hint-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.feedback-text { font-size: 16px; font-weight: bold; display: block; }
 .text-green { color: #4ade80; }
 .text-yellow { color: #facc15; }
 .placeholder { color: #9ca3af; font-size: 14px; }
@@ -523,28 +572,9 @@ const quitTest = () => {
 .btn-sub-text { font-size: 12px; color: #00f0ff; letter-spacing: 1px; }
 .arrow-icon { width: 24px; height: 24px; opacity: 0.5; }
 
-/* Glitch Overlay */
-.glitch-active {
-  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-}
-.glitch-overlay {
-  position: absolute; inset: 0; z-index: 999;
-  background: rgba(239, 68, 68, 0.2);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  pointer-events: none;
-  mix-blend-mode: hard-light;
-}
-.glitch-text {
-  font-size: 32px; font-weight: 900; color: #fff;
-  text-shadow: 2px 2px #ff0000, -2px -2px #0000ff;
-  animation: glitch-skew 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
-}
-.glitch-sub {
-  color: #fff; font-size: 14px; background: #ef4444; padding: 2px 8px; margin-top: 8px;
-}
+/* Glitch Overlay (Removed) */
+/* .glitch-active, .glitch-overlay, .glitch-text, .glitch-sub removed */
 
-@keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
-@keyframes glitch-skew { 0% { transform: skew(0deg); } 20% { transform: skew(-20deg); } 40% { transform: skew(10deg); } 60% { transform: skew(-5deg); } 80% { transform: skew(5deg); } 100% { transform: skew(0deg); } }
 @keyframes pulse-fast { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 .stimulus-number {

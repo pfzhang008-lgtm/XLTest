@@ -15,11 +15,11 @@
         <!-- Timer moved or kept with padding -->
       </view>
       
-      <!-- Timer and Status Row (New) -->
+      <!-- Progress and Status Row -->
       <view class="status-row">
         <view class="timer-pill">
-          <text class="material-icons timer-icon">timer</text>
-          <text class="timer-text">{{ formattedTime }}</text>
+          <text class="material-icons timer-icon">format_list_bulleted</text>
+          <text class="timer-text">{{ currentRound }} / {{ maxRounds }}</text>
         </view>
         <view class="system-status">
            <text class="status-text">SYSTEM_ACTIVE</text>
@@ -35,7 +35,7 @@
           <view class="ruler-thumb" :style="{ left: progressPercent + '%' }"></view>
         </view>
         <view class="ruler-ticks">
-          <view v-for="i in 20" :key="i" class="tick" :class="{ 'tick-major': i % 5 === 0 }"></view>
+          <view v-for="i in tickCount" :key="i" class="tick" :class="{ 'tick-major': i % 5 === 0 }"></view>
         </view>
       </view>
       
@@ -106,6 +106,19 @@
 <script>
 import CountdownOverlay from '@/components/CountdownOverlay.vue';
 import { getNormsByAge } from '@/utils/testConfigManager.js';
+import mod01Config from '@/data/config_mod01.json';
+import mod02Config from '@/data/config_mod02.json';
+import mod03Config from '@/data/config_mod03.json';
+import mod04Config from '@/data/config_mod04.json';
+import mod05Config from '@/data/config_mod05.json';
+
+const configMap = {
+  '01': mod01Config,
+  '02': mod02Config,
+  '03': mod03Config,
+  '04': mod04Config,
+  '05': mod05Config
+};
 
 export default {
   components: {
@@ -121,8 +134,10 @@ export default {
       
       // Game Config
       config: null,
+      moduleId: '01',
       maxRounds: 20,
       timeLimitMs: 3000,
+      isEmotionalMode: false,
       
       currentRound: 1,
       startTime: 0,
@@ -147,6 +162,8 @@ export default {
       
       // Assets
       words: ['红', '蓝', '黄'],
+      customWords: [], // For Emotional Stroop
+      neutralWords: [], // For Emotional Stroop
       colors: {
         blue: '#0099FF', // Bright Blue
         yellow: '#FFFF00', // Bright Yellow
@@ -156,17 +173,18 @@ export default {
     };
   },
   computed: {
-    formattedTime() {
-      // Format displayTime (seconds) to MM:SS
-      const m = Math.floor(this.displayTime / 60);
-      const s = this.displayTime % 60;
-      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    tickCount() {
+      // Limit ticks to avoid crowding, max 20 or actual rounds if less
+      return Math.min(20, this.maxRounds);
     },
     progressPercent() {
       return (this.currentRound / this.maxRounds) * 100;
     }
   },
-  onLoad() {
+  onLoad(options) {
+    if (options.moduleId) {
+      this.moduleId = options.moduleId;
+    }
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
 
@@ -184,9 +202,29 @@ export default {
     this.navPaddingBottom = 4;
     // #endif
 
+    // Check for Emotional Mode
+    if (options.mode === 'emotional') {
+      this.isEmotionalMode = true;
+      const currentModuleConfig = configMap[this.moduleId] || mod01Config;
+      const esConfig = currentModuleConfig.testQueue.find(t => t.type === 'EmotionalStroop');
+      
+      if (esConfig) {
+        this.customWords = esConfig.customWordBank || [];
+        this.neutralWords = esConfig.neutralWordBank || [];
+      }
+      uni.setNavigationBarTitle({ title: '潜意识情绪探测' });
+    }
+
     // Load User Config
-    const userProfile = uni.getStorageSync('user_profile') || {};
-    const userAge = userProfile.age || 18; // Default to 18 if not found
+    let userAge = 18;
+    const parentSurvey = uni.getStorageSync('parent_survey_result');
+    if (parentSurvey && parentSurvey.ageGroup) {
+      if (parentSurvey.ageGroup === 'low_age') userAge = 10;
+      else if (parentSurvey.ageGroup === 'high_age') userAge = 15;
+    } else {
+      const userProfile = uni.getStorageSync('user_profile') || {};
+      userAge = userProfile.age || 18;
+    }
     
     // Get norms for Stroop
     this.config = getNormsByAge(userAge, 'stroop');
@@ -197,6 +235,7 @@ export default {
     }
 
     // this.startGame(); // Moved to handleCountdownComplete
+    this.generateRoundData();
   },
   onUnload() {
     this.stopTimer();
@@ -258,6 +297,75 @@ export default {
       }, 300);
     },
     
+    generateRoundData() {
+      // 1. Decide Target Ink Color
+      const targetTypes = ['blue', 'yellow', 'red'];
+      const type = targetTypes[Math.floor(Math.random() * targetTypes.length)];
+      this.currentInkType = type;
+      this.currentInkColor = this.colors[type];
+      
+      let textType = null;
+
+      if (this.isEmotionalMode) {
+        // Emotional Mode: Mix of Emotional and Neutral words
+        const allWords = [...this.customWords, ...this.neutralWords];
+        if (allWords.length > 0) {
+          this.currentWordText = allWords[Math.floor(Math.random() * allWords.length)];
+        } else {
+          // Fallback if no words loaded
+          this.currentWordText = '###';
+        }
+        // No textType mapping for emotional words (interference is semantic/emotional, not color-conflict)
+      } else {
+        // Standard Mode
+        // 2. Decide Word Text (Distractor)
+        // Restricted to red/yellow/blue to ensure we can create a button for it.
+        const distractorWords = ['红', '黄', '蓝'];
+        this.currentWordText = distractorWords[Math.floor(Math.random() * distractorWords.length)];
+        
+        // Map Chinese word to color type
+        const wordToType = {
+          '红': 'red',
+          '黄': 'yellow',
+          '蓝': 'blue'
+        };
+        textType = wordToType[this.currentWordText];
+      }
+
+      // 3. Randomize Buttons (Only 2 buttons shown at a time)
+      const allButtons = [
+        { type: 'blue', label: '蓝色', sub: 'SYNC BLUE', class: 'blue-btn' },
+        { type: 'yellow', label: '黄色', sub: 'SYNC YELLOW', class: 'yellow-btn' },
+        { type: 'red', label: '红色', sub: 'SYNC RED', class: 'red-btn' }
+      ];
+
+      // Button A: Correct Answer (Ink Color)
+      const correctButton = allButtons.find(b => b.type === this.currentInkType);
+
+      // Button B: Distractor
+      let distractorButton = null;
+      
+      if (!this.isEmotionalMode && textType && textType !== this.currentInkType) {
+        // Standard Stroop: Prefer the button that matches the Text Content (Strong Distractor)
+        distractorButton = allButtons.find(b => b.type === textType);
+      }
+      
+      if (!distractorButton) {
+        // If Emotional Mode OR Text==Ink OR TextType not found
+        // Pick a random other color
+        const otherButtons = allButtons.filter(b => b.type !== this.currentInkType);
+        distractorButton = otherButtons[Math.floor(Math.random() * otherButtons.length)];
+      }
+
+      // Shuffle position
+      this.currentButtons = [correctButton, distractorButton].sort(() => Math.random() - 0.5);
+
+      this.roundStartTime = Date.now();
+      
+      // Start Timer
+      this.startTimer();
+    },
+
     nextRound() {
       if (this.currentRound > this.maxRounds) {
         this.finishGame();
@@ -270,57 +378,11 @@ export default {
       // Start the per-round timer
       this.startTimer();
       
-      // 1. Decide Target Ink Color
-      const targetTypes = ['blue', 'yellow', 'red'];
-      const type = targetTypes[Math.floor(Math.random() * targetTypes.length)];
-      this.currentInkType = type;
-      this.currentInkColor = this.colors[type];
-      
-      // 2. Decide Word Text (Distractor)
-      // Restricted to red/yellow/blue to ensure we can create a button for it.
-      const distractorWords = ['红', '黄', '蓝'];
-      this.currentWordText = distractorWords[Math.floor(Math.random() * distractorWords.length)];
-      
-      // Map Chinese word to color type
-      const wordToType = {
-        '红': 'red',
-        '黄': 'yellow',
-        '蓝': 'blue'
-      };
-      const textType = wordToType[this.currentWordText];
-
-      // 3. Randomize Buttons (Only 2 buttons)
-      const allButtons = [
-        { type: 'blue', label: '蓝色', sub: 'SYNC BLUE', class: 'blue-btn' },
-        { type: 'yellow', label: '黄色', sub: 'SYNC YELLOW', class: 'yellow-btn' },
-        { type: 'red', label: '红色', sub: 'SYNC RED', class: 'red-btn' }
-      ];
-
-      // Button A: Correct Answer (Ink Color)
-      const correctButton = allButtons.find(b => b.type === this.currentInkType);
-
-      // Button B: Distractor (Text Content)
-      let distractorButton = allButtons.find(b => b.type === textType);
-
-      // If Correct Answer == Text Content (Congruent), pick a random OTHER color
-      if (this.currentInkType === textType) {
-        const otherOptions = allButtons.filter(b => b.type !== this.currentInkType);
-        distractorButton = otherOptions[Math.floor(Math.random() * otherOptions.length)];
-      }
-
-      // Combine correct and distractor buttons
-      const buttons = [correctButton, distractorButton];
-      
-      // Fisher-Yates Shuffle
-      for (let i = buttons.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [buttons[i], buttons[j]] = [buttons[j], buttons[i]];
-      }
-      
-      this.currentButtons = buttons;
+      this.generateRoundData();
     },
     
     handleInput(inputType) {
+      if (this.showCountdown) return; // Prevent input during countdown
       if (this.feedback) return; // Prevent double tap
       
       this.stopTimer(); // Stop the timer immediately on input
@@ -371,8 +433,9 @@ export default {
       };
 
       // Navigate to Result
+      const testType = this.isEmotionalMode ? 'EmotionalStroop' : 'Stroop';
       uni.redirectTo({
-        url: `/pages/neural-link/Stroop-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}`
+        url: `/pages/neural-link/result?moduleId=${this.moduleId}&testType=${testType}&data=${encodeURIComponent(JSON.stringify(resultPayload))}`
       });
     }
   }
@@ -680,7 +743,7 @@ page {
 }
 
 .btn-label {
-  font-size: 48rpx;
+  font-size: 102rpx;
   font-weight: 700;
   letter-spacing: 2px;
 }

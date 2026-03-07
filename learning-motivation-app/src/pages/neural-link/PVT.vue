@@ -151,6 +151,7 @@ export default {
       currentRound: 0,
       maxRounds: 5,
       config: null, // Dynamic configuration
+      moduleId: '01', // Default
       
       // Hardware Monitor Data
       fps: 60.0,
@@ -185,13 +186,27 @@ export default {
       return 'cyan-text';
     }
   },
-  onLoad() {
+  onLoad(options) {
+    if (options.moduleId) {
+      this.moduleId = options.moduleId;
+    }
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
 
     // Load User Config
-    const userProfile = uni.getStorageSync('user_profile') || {};
-    const userAge = userProfile.age || 18;
+    let userAge = 18; // Default
+    
+    // Check if coming from parent survey
+    const parentSurvey = uni.getStorageSync('parent_survey_result');
+    if (parentSurvey && parentSurvey.ageGroup) {
+      // Map age group to a representative age for norms
+      if (parentSurvey.ageGroup === 'low_age') userAge = 10;
+      else if (parentSurvey.ageGroup === 'high_age') userAge = 15;
+    } else {
+      const userProfile = uni.getStorageSync('user_profile') || {};
+      userAge = userProfile.age || 18;
+    }
+
     this.config = getNormsByAge(userAge, 'pvt');
     
     if (this.config) {
@@ -399,8 +414,8 @@ export default {
 
       const resultPayload = {
         metrics: {
-          averageMs: Math.round(avgReactionTime),
-          falseStarts: this.falseStartCount,
+          avgTime: Math.round(avgReactionTime),
+          errors: this.falseStartCount,
           reactionTimes: this.reactionTimes
         },
         thresholds: {
@@ -411,7 +426,7 @@ export default {
       };
 
       uni.redirectTo({
-        url: `/pages/neural-link/PVT-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}`
+        url: `/pages/neural-link/result?moduleId=${this.moduleId}&testType=PVT&data=${encodeURIComponent(JSON.stringify(resultPayload))}`
       });
     }
   }

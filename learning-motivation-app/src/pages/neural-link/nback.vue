@@ -99,6 +99,12 @@
         <text class="btn-sub">不匹配</text>
       </button>
     </view>
+    
+    <!-- Countdown Overlay -->
+    <CountdownOverlay 
+      v-if="showCountdown" 
+      @complete="handleCountdownComplete" 
+    />
   </view>
 </template>
 
@@ -106,6 +112,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { getNormsByAge } from '@/utils/testConfigManager.js';
+import CountdownOverlay from '@/components/CountdownOverlay.vue';
 
 // --- Icons (Static Files) ---
 const icons = {
@@ -118,6 +125,7 @@ const icons = {
 
 // Config state
 const config = ref(null);
+const moduleId = ref('');
 const N = ref(2); // N-Back level
 const intervalMs = ref(2000);
 const displayMs = ref(500);
@@ -134,6 +142,7 @@ const correctRejections = ref(0); // Track correct rejections for accuracy calc
 const feedback = ref(null); // 'correct', 'wrong', null
 const feedbackText = ref('');
 const isGameActive = ref(false);
+const showCountdown = ref(true);
 
 let sequenceTimer = null;
 let currentRoundMatchPressed = false;
@@ -154,7 +163,10 @@ const progressPercent = computed(() => {
 });
 
 // --- Lifecycle ---
-onLoad(() => {
+onLoad((options) => {
+  if (options && options.moduleId) {
+    moduleId.value = options.moduleId;
+  }
   const userProfile = uni.getStorageSync('user_profile') || {};
   const age = userProfile.age || 18;
   config.value = getNormsByAge(age, 'nback');
@@ -168,7 +180,7 @@ onLoad(() => {
 });
 
 onMounted(() => {
-  startGame();
+  // startGame(); // Wait for countdown
 });
 
 onUnmounted(() => {
@@ -176,6 +188,11 @@ onUnmounted(() => {
 });
 
 // --- Game Logic ---
+const handleCountdownComplete = () => {
+  showCountdown.value = false;
+  startGame();
+};
+
 const startGame = () => {
   console.log('N-Back: Game Started');
   isGameActive.value = true;
@@ -228,7 +245,7 @@ const endGame = () => {
   setTimeout(() => {
     uni.hideLoading();
     uni.redirectTo({ 
-      url: `/pages/neural-link/nback-result?data=${encodeURIComponent(JSON.stringify(resultPayload))}` 
+      url: `/pages/neural-link/result?moduleId=${moduleId.value}&testType=NBack&data=${encodeURIComponent(JSON.stringify(resultPayload))}` 
     });
   }, 1500);
 };
