@@ -2,15 +2,6 @@
   <view class="container">
     <!-- Main Content -->
     <view class="content">
-      <view class="glass-card gold-theme">
-        <view class="title-row">
-          <text class="card-title">我的</text>
-        </view>
-        <view class="desc-box">
-          <text class="desc-text">个人中心与数据管理。</text>
-        </view>
-      </view>
-
       <!-- Settings Menu -->
       <view class="menu-list">
         <view class="glass-card menu-item" @click="navigateToCalibration">
@@ -27,28 +18,36 @@
         <!-- Data Reset Section -->
         <view class="section-title">数据重置</view>
         
-        <!-- Batch Reset -->
-        <view class="glass-card menu-item warning-item" @click="resetAllExceptParent">
-          <view class="menu-icon-box warning-box">
-             <image class="menu-icon" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0VGNDQ0NCI+PHBhdGggZD0iTTEyIDJDNi40NyAyIDIgNi40NyAyIDEyczQuNDcgMTAgMTAgMTAgMTAtNC40NyAxMC0xMFMxNy41MyAyIDEyIDJ6bTUgMTMuNTlMMTUuNTkgMTcgMTIgMTMuNDEgOC40MSAxNyA3IDE1LjU5IDEwLjU5IDEyIDcgOC40MSA4LjQxIDcgMTIgMTAuNTkgMTUuNTkgNyAxNyA4LjQxIDEzLjQxIDEyIDE3IDE1LjU5eiIvPjwvc3ZnPg==" mode="aspectFit"></image>
-          </view>
-          <view class="menu-content">
-            <text class="menu-title text-warning">重置除家长问卷外所有数据</text>
-            <text class="menu-sub">保留基础档案，清除所有神经测试进度</text>
-          </view>
-          <view class="menu-arrow">></view>
-        </view>
-
-        <!-- Module Specific Reset -->
-        <view class="grid-container">
+        <view class="module-reset-list">
           <view 
-            class="glass-card grid-item" 
-            v-for="i in 5" 
-            :key="i"
-            @click="resetModuleData(i)"
+            v-for="(mod, index) in modules" 
+            :key="index" 
+            class="glass-card reset-card"
           >
-            <text class="grid-title">重置模块 {{String(i).padStart(2, '0')}}</text>
-            <text class="grid-sub">清除 Mod {{String(i).padStart(2, '0')}} 数据</text>
+            <view class="reset-header">
+              <text class="reset-title">{{ mod.title }}</text>
+              <text class="reset-subtitle">Module {{ mod.id }}</text>
+            </view>
+            
+            <view class="reset-actions">
+              <button 
+                class="reset-btn btn-child" 
+                hover-class="btn-hover"
+                @click="resetChildData(mod.id)"
+              >
+                <text>清除测试进度</text>
+                <text class="btn-desc">保留家长问卷</text>
+              </button>
+              
+              <button 
+                class="reset-btn btn-all" 
+                hover-class="btn-hover"
+                @click="resetAllModuleData(mod.id)"
+              >
+                <text>彻底重置</text>
+                <text class="btn-desc">含问卷及档案</text>
+              </button>
+            </view>
           </view>
         </view>
 
@@ -67,6 +66,17 @@ export default {
   components: {
     AppTabBar
   },
+  data() {
+    return {
+      modules: [
+        { id: '01', title: '沉迷游戏 · 手机成瘾' },
+        { id: '02', title: '沉迷刷手机 · 脑雾' },
+        { id: '03', title: '严重分心 · 疑似多动' },
+        { id: '04', title: '考前焦虑 · 发挥失常' },
+        { id: '05', title: '严重厌学 · 动力丧失' }
+      ]
+    };
+  },
   onShow() {
     uni.hideTabBar();
   },
@@ -82,68 +92,68 @@ export default {
         url: '/pages/onboarding/calibration'
       });
     },
-    resetModuleData(moduleId) {
+    // Clear only child test data (keep survey)
+    resetChildData(moduleId) {
       uni.showModal({
-        title: '确认重置',
-        content: `确定要清除 模块 ${moduleId} 的所有数据吗？此操作不可恢复。`,
-        confirmColor: '#EF4444',
+        title: '清除测试进度',
+        content: `保留家长问卷，仅清除 模块 ${moduleId} 的孩子测试进度？`,
+        confirmText: '清除进度',
+        confirmColor: '#F59E0B',
         success: (res) => {
           if (res.confirm) {
-            this.performReset(moduleId);
+            this.performReset(moduleId, true);
           }
         }
       });
     },
-    resetAllExceptParent() {
+    // Clear ALL data for module
+    resetAllModuleData(moduleId) {
       uni.showModal({
-        title: '危险操作',
-        content: '确定要清除除家长问卷外的所有测试数据吗？这将重置所有神经测试进度。',
+        title: '彻底重置',
+        content: `警告：将清除 模块 ${moduleId} 的所有数据（含家长问卷）。需重新填写问卷才能测试。`,
+        confirmText: '彻底清除',
         confirmColor: '#EF4444',
         success: (res) => {
           if (res.confirm) {
-            // Reset Mod 02-05
-            [2, 3, 4, 5].forEach(id => this.performReset(id, false));
-            // Also clear generic test states if any
-            uni.removeStorageSync('active_module_id');
-            uni.removeStorageSync('current_step');
-            uni.showToast({
-              title: '重置成功',
-              icon: 'success'
-            });
+            this.performReset(moduleId, false);
           }
         }
       });
     },
-    performReset(moduleId, showToast = true) {
+    performReset(moduleId, keepSurvey = false) {
       try {
         const idStr = String(moduleId).padStart(2, '0');
-        const prefix = `module_${idStr}`;
-        const res = uni.getStorageInfoSync();
+        const prefix = `module_${idStr}`; // e.g. module_01
+        // survey key pattern: module_01_survey_completed
+        const surveyKey = `module_${idStr}_survey_completed`;
         
+        const res = uni.getStorageInfoSync();
         let count = 0;
+        
         res.keys.forEach(key => {
+          // Check if key belongs to this module
           if (key.startsWith(prefix)) {
+            // If keepSurvey is true, SKIP the survey key
+            if (keepSurvey && key === surveyKey) {
+              return;
+            }
             uni.removeStorageSync(key);
             count++;
           }
         });
         
-        console.log(`[Reset] Cleared ${count} keys for Module ${moduleId}`);
+        console.log(`[Reset] Cleared ${count} keys for Module ${moduleId} (Keep Survey: ${keepSurvey})`);
         
-        if (showToast) {
-          uni.showToast({
-            title: `模块 ${moduleId} 已重置`,
-            icon: 'none'
-          });
-        }
+        uni.showToast({
+          title: keepSurvey ? '进度已重置' : '模块已彻底重置',
+          icon: 'none'
+        });
       } catch (e) {
         console.error(`[Reset] Error resetting module ${moduleId}:`, e);
-        if (showToast) {
-          uni.showToast({
-            title: '重置失败',
-            icon: 'none'
-          });
-        }
+        uni.showToast({
+          title: '重置失败',
+          icon: 'none'
+        });
       }
     }
   }
@@ -229,24 +239,6 @@ export default {
   margin-left: 16rpx;
 }
 
-.gold-theme {
-  box-shadow: 0 0 20px rgba(245, 158, 11, 0.05);
-  border-color: rgba(245, 158, 11, 0.3);
-}
-
-.card-title {
-  font-size: 36rpx;
-  font-weight: bold;
-  color: #F59E0B;
-  margin-bottom: 20rpx;
-  display: block;
-}
-
-.desc-text {
-  font-size: 28rpx;
-  color: #9ca3af;
-}
-
 /* Section Title */
 .section-title {
   font-size: 28rpx;
@@ -257,51 +249,89 @@ export default {
   line-height: 1;
 }
 
-/* Warning Styles */
-.warning-item {
-  border-color: rgba(239, 68, 68, 0.3);
-}
-
-.warning-item:active {
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.warning-box {
-  background: rgba(239, 68, 68, 0.1);
-}
-
-.text-warning {
-  color: #EF4444;
-}
-
-/* Grid Layout for Modules */
-.grid-container {
+/* Module Reset List */
+.module-reset-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.reset-card {
+  display: flex;
+  flex-direction: column;
+  padding: 32rpx;
+  margin-bottom: 0;
+}
+
+.reset-header {
+  margin-bottom: 24rpx;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.reset-title {
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #e2e8f0;
+}
+
+.reset-subtitle {
+  font-size: 24rpx;
+  color: #64748b;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.reset-actions {
+  display: flex;
   gap: 20rpx;
 }
 
-.grid-item {
-  width: calc(50% - 10rpx);
-  padding: 24rpx;
-  margin-bottom: 0;
-  box-sizing: border-box;
+.reset-btn {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  min-height: 140rpx;
+  padding: 24rpx 10rpx;
+  border-radius: 16rpx;
+  line-height: 1.2;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s;
 }
 
-.grid-title {
-  font-size: 28rpx;
+.reset-btn::after {
+  border: none;
+}
+
+.reset-btn text:first-child {
+  font-size: 26rpx;
   font-weight: bold;
-  color: #e2e8f0;
   margin-bottom: 8rpx;
 }
 
-.grid-sub {
-  font-size: 22rpx;
-  color: #9ca3af;
+.btn-desc {
+  font-size: 20rpx;
+  opacity: 0.7;
+}
+
+/* Button Variants */
+.btn-child {
+  color: #F59E0B;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.btn-child:active {
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.btn-all {
+  color: #EF4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-all:active {
+  background: rgba(239, 68, 68, 0.1);
 }
 </style>

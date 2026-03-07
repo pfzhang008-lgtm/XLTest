@@ -1,8 +1,21 @@
 <template>
   <view class="page-container">
+    <view class="scanlines"></view>
+    
+    <!-- Clinical Monitor Header (Fixed) -->
+    <view class="cyber-header" :style="{ paddingTop: (statusBarHeight || 20) + 'px' }">
+      <view class="header-content">
+        <text class="sys-title">NEURO-SYNC</text>
+        <view class="sys-status">
+          <view class="status-dot pulse"></view>
+          <text class="status-text">SYSTEM ONLINE</text>
+        </view>
+      </view>
+    </view>
+
     <!-- Main Content -->
     <scroll-view scroll-y="true" class="main-content">
-      <!-- Header Section -->
+      <!-- Header Section (Page Title) -->
       <view class="header-section">
         <view class="header-icon-box">
           <image class="header-icon" :src="icons.brain" mode="aspectFit"></image>
@@ -30,8 +43,12 @@
                   v-for="(tag, tIndex) in item.tags" 
                   :key="tIndex" 
                   class="feature-tag"
+                  :style="{ 
+                    borderColor: item.borderColor, 
+                    backgroundColor: item.dimBg, 
+                  }"
                 >
-                  <text>{{ tag }}</text>
+                  <text :style="{ color: item.accentColor }">{{ tag }}</text>
                 </view>
               </view>
             </view>
@@ -39,10 +56,12 @@
             <!-- Right Icon -->
             <view class="card-right">
               <image 
-                class="card-icon" 
+                class="card-icon blend-screen" 
                 :src="item.image" 
                 mode="aspectFit"
+                :style="{ filter: 'drop-shadow(0 0 12px ' + item.accentColor + ')' }"
               ></image>
+              <text class="action-hint" :style="{ color: item.accentColor }">   </text>
             </view>
           </view>
         </view>
@@ -73,11 +92,12 @@ export default {
   },
   data() {
     return {
+      statusBarHeight: 0,
       isCalibrated: false,
       // Icons (SVG Data URIs - Base64 Encoded for WeChat Compatibility)
       icons: {
         // Header Icon
-        brain: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzY0NzQ4YiI+PHBhdGggZD0iTTEyIDJDNy41OCAyIDQgNC4yNCA0IDcuNUg0QzMuMjIgNy41IDMuNSA3LjU2IDMuNyA3LjY0QzIuNjkgOC4zMyAyIDEwLjAzIDIgMTJDMiAxMy45NyAyLjY5IDE1LjY3IDMuNyAxNi4zNkMzLjUgMTYuNDQgMy4yMiAxNi41IDQgMTYuNUg0QzQgMTkuNzYgNy41OCAyMiAxMiAyMkMxNi40MiAyMiAyMCAxOS43NiAyMCAxNi41SDIwQzIwLjc4IDE2LjUgMjAuNSAxNi40NCAyMC4zIDE2LjM2QzIxLjMxIDE1LjY3IDIyIDEzLjk3IDIyIDEyQzIyIDEwLjAzIDIxLjMxIDguMzMgMjAuMyA3LjY0QzIwLjUgNy41NiAyMC43OCA3LjUgMjAgNy41SDIwQzIwIDQuMjQgMTYuNDIgMiAxMiAyWk0xMy41IDUuMTNDMTUuNzMgNS40IDE3LjUgNy4yNSAxNy45MyA5LjU1QzE3Ljk2IDkuNzcgMTguMTMgOS45NCAxOC4zNCA5Ljk4QzE5LjE4IDEwLjEzIDE5LjcxIDEwLjg0IDE5LjcxIDExLjc1QzE5LjcxIDEyLjY2IDE5LjE4IDEzLjM3IDE4LjM0IDEzLjUyQzE4LjEzIDEzLjU2IDE3Ljk2IDEzLjczIDE3LjkzIDEzLjk1QzE3LjUgMTYuMjUgMTUuNzMgMTguMSAxMy41IDE4LjM3VjUuMTNaTTYuMDcgOS41NUM2LjUgNy4yNSA4LjI3IDUuNCAxMC41IDUuMTNWMTguMzdDOC4yNyAxOC4xIDYuNSAxNi4yNSA2LjA3IDEzLjk1QzYuMDQgMTMuNzMgNS44NyAxMy41NiA1LjY2IDEzLjUyQzQuODIgMTMuMzcgNC4yOSAxMi42NiA0LjI5IDExLjc1QzQuMjkgMTAuODQgNC44MiAxMC4xMyA1LjY2IDkuOThDNS44NyA5Ljk0IDYuMDQgOS43NyA2LjA3IDkuNTVaIi8+PC9zdmc+',
+        brain: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzY0NzQ4YiI+PHBhdGggZD0iTTEyIDJDNy41OCAyIDQgNC4yNCA0IDcuNUg0QzMuMjIgNy41IDMuNSA3LjU2IDMuNyA3LjY0QzIuNjkgOC4zMyAyIDEwLjAzIDIgMTJDMiAxMy45NyAyLjY5IDE1LjY3IDMuNyAxNi4zNkMzLjUgMTYuNDQgMy4yMiAxNi41IDQgMTYuNUg0QzQgMTkuNzYgNy41OCAyMiAxMiAyMkMxNi40MiAyMiAyMCAxOS43NiAyMCAxNi41SDIwQzIwLjc4IDE2LjUgMjAuNSAxNi40NCAyMC4zIDE2LjM2QzIxLjMxIDE1LjY3IDIyIDEzLjk3IDIyIDEyQzIyIDEwLjAzIDIxLjMxIDguMzMgMjAuMyA3LjY0QzIwLjUgNy41NiAyMC43OCA3LjUgMjAgNy41SDIwQzIwIDQuMjQgMTYuNDIgMiAxMiAyWk0xMy41IDUuMTNDMTUuNzMgNS40IDE3LjUgNy4yNSAxNy45MyA5LjU1QzE3Ljk2IDkuNzcgMTguMTMgOS45NCAxOC4zNCA5Ljk4QzE5LjE4IDEwLjEzIDE5LjcxIDEwLjg0IDE5LjcxIDExLjc1QzE5LjcxIDEyLjY2IDE5LjE4IDEzLjM3IDE4LjM0IDEzLjUyQzE4LjEzIDEzLjU2IDE3Ljk2IDEzLjk1IDE3LjkzIDEzLjk1QzE3LjUgMTYuMjUgMTUuNzMgMTguMSAxMy41IDE4LjM3VjUuMTNaTTYuMDcgOS41NUM2LjUgNy4yNSA4LjI3IDUuNCAxMC41IDUuMTNWMTguMzdDOC4yNyAxOC4xIDYuNSAxNi4yNSA2LjA3IDEzLjk1QzYuMDQgMTMuNzMgNS44NyAxMy41NiA1LjY2IDEzLjUyQzQuODIgMTMuMzcgNC4yOSAxMi42NiA0LjI5IDExLjc1QzQuMjkgMTAuODQgNC44MiAxMC4xMyA1LjY2IDkuOThDNS44NyA5Ljk0IDYuMDQgOS43NyA2LjA3IDkuNTVaIi8+PC9zdmc+',
         
         // Module Icons
         bolt: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI1ZjRmNCI+PHBhdGggZD0iTTExIDIxaC0xbDEtN0g3LjVjLS41OCAwLS41Ny0uMzItLjM4LS42Ni4xOS0uMzQuMDUtLjA4LjA3LS4xMkM4LjQ4IDEwLjk0IDEwLjQyIDcuNTQgMTMgM2gxcy0xIDdoMy41Yy40OSAwIC41Ni4zMy40Ny41MWwtLjA3LjE1QzEyLjk2IDE3LjU1IDExIDIxIDExIDIxeiIvPjwvc3ZnPg==',
@@ -184,6 +204,14 @@ export default {
     this.modules[2].image = this.icons.scope;
     this.modules[3].image = this.icons.vital;
     this.modules[4].image = this.icons.power;
+  },
+  onLoad() {
+    try {
+      const sysInfo = uni.getSystemInfoSync();
+      this.statusBarHeight = sysInfo.statusBarHeight || 20;
+    } catch (e) {
+      this.statusBarHeight = 20;
+    }
   },
   onShow() {
     uni.hideTabBar();
@@ -403,9 +431,9 @@ export default {
 }
 
 .card-right {
-  width: 100rpx;
-  height: 100rpx;
+  width: 120rpx;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
@@ -413,8 +441,8 @@ export default {
 }
 
 .card-icon {
-  width: 100%;
-  height: 100%;
+  width: 80rpx;
+  height: 80rpx;
   object-fit: contain;
   opacity: 0.9; /* Slight transparency to reduce glare */
 }
@@ -490,5 +518,83 @@ export default {
   font-size: 24rpx;
   color: #94a3b8;
   letter-spacing: 1px;
+}
+
+/* --- UI Polish Additions --- */
+
+/* 1. Cyber Header */
+.cyber-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(15, 23, 42, 0.85); /* Dark blue glass */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(37, 244, 244, 0.2);
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.5);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30rpx;
+  height: 88rpx; /* Standard nav bar height */
+}
+
+.sys-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: bold;
+  font-size: 36rpx;
+  color: #25f4f4; /* Cyan */
+  letter-spacing: 2px;
+  text-shadow: 0 0 10rpx rgba(37, 244, 244, 0.6);
+}
+
+.sys-status {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  border: 1px solid rgba(37, 244, 244, 0.3);
+  padding: 4rpx 12rpx;
+  border-radius: 20rpx;
+  background: rgba(37, 244, 244, 0.05);
+}
+
+.status-dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background-color: #25f4f4;
+  box-shadow: 0 0 8rpx #25f4f4;
+}
+
+.status-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20rpx;
+  font-weight: bold;
+  color: #25f4f4;
+  opacity: 0.9;
+  letter-spacing: 1px;
+}
+
+/* 2. Action Hint */
+.action-hint {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18rpx;
+  font-weight: bold;
+  opacity: 0.9;
+  margin-top: 12rpx;
+  letter-spacing: 1px;
+  text-shadow: 0 0 5rpx currentColor;
+  white-space: nowrap;
+}
+
+/* 3. Adjust Header Section padding to account for fixed header */
+.header-section {
+  /* Push content down to clear fixed header (approx 160rpx total) */
+  padding-top: calc(var(--status-bar-height) + 160rpx) !important; 
 }
 </style>
