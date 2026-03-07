@@ -1,16 +1,23 @@
 <template>
   <view class="page-container">
-    <!-- Scanline Overlay Effect -->
-    <view class="scanlines"></view>
-    
     <!-- Main Content -->
     <scroll-view scroll-y="true" class="main-content">
+      <!-- Header Section -->
+      <view class="header-section">
+        <view class="header-icon-box">
+          <image class="header-icon" :src="icons.brain" mode="aspectFit"></image>
+        </view>
+        <view class="header-text-box">
+          <text class="header-title">Neuro Sync</text>
+          <text class="header-subtitle">青少年神经动力学评估系统</text>
+        </view>
+      </view>
+
       <view class="cards-container">
         <view 
           v-for="(item, index) in modules" 
           :key="index"
-          class="cyber-card"
-          :style="{ '--card-color': item.color, '--border-color': item.borderColor, '--card-shadow': item.shadowColor }"
+          class="assessment-card"
           @click="handleModuleClick(item)"
         >
           <view class="card-content">
@@ -32,10 +39,9 @@
             <!-- Right Icon -->
             <view class="card-right">
               <image 
-                class="card-icon blend-screen" 
+                class="card-icon" 
                 :src="item.image" 
                 mode="aspectFit"
-                :style="{ filter: 'drop-shadow(0 0 2px ' + item.accentColor + ')' }"
               ></image>
             </view>
           </view>
@@ -68,21 +74,34 @@ export default {
   data() {
     return {
       isCalibrated: false,
-      // Icons (SVG Data URIs)
+      // Icons (SVG Data URIs - Base64 Encoded for WeChat Compatibility)
       icons: {
-        bolt: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2325f4f4%22%3E%3Cpath d%3D%22M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z%22%2F%3E%3C%2Fsvg%3E',
-        gamepad: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2325f4f4%22%3E%3Cpath d%3D%22M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z%22%2F%3E%3C%2Fsvg%3E',
+        // Header Icon
+        brain: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzY0NzQ4YiI+PHBhdGggZD0iTTEyIDJDNy41OCAyIDQgNC4yNCA0IDcuNUg0QzMuMjIgNy41IDMuNSA3LjU2IDMuNyA3LjY0QzIuNjkgOC4zMyAyIDEwLjAzIDIgMTJDMiAxMy45NyAyLjY5IDE1LjY3IDMuNyAxNi4zNkMzLjUgMTYuNDQgMy4yMiAxNi41IDQgMTYuNUg0QzQgMTkuNzYgNy41OCAyMiAxMiAyMkMxNi40MiAyMiAyMCAxOS43NiAyMCAxNi41SDIwQzIwLjc4IDE2LjUgMjAuNSAxNi40NCAyMC4zIDE2LjM2QzIxLjMxIDE1LjY3IDIyIDEzLjk3IDIyIDEyQzIyIDEwLjAzIDIxLjMxIDguMzMgMjAuMyA3LjY0QzIwLjUgNy41NiAyMC43OCA3LjUgMjAgNy41SDIwQzIwIDQuMjQgMTYuNDIgMiAxMiAyWk0xMy41IDUuMTNDMTUuNzMgNS40IDE3LjUgNy4yNSAxNy45MyA5LjU1QzE3Ljk2IDkuNzcgMTguMTMgOS45NCAxOC4zNCA5Ljk4QzE5LjE4IDEwLjEzIDE5LjcxIDEwLjg0IDE5LjcxIDExLjc1QzE5LjcxIDEyLjY2IDE5LjE4IDEzLjM3IDE4LjM0IDEzLjUyQzE4LjEzIDEzLjU2IDE3Ljk2IDEzLjczIDE3LjkzIDEzLjk1QzE3LjUgMTYuMjUgMTUuNzMgMTguMSAxMy41IDE4LjM3VjUuMTNaTTYuMDcgOS41NUM2LjUgNy4yNSA4LjI3IDUuNCAxMC41IDUuMTNWMTguMzdDOC4yNyAxOC4xIDYuNSAxNi4yNSA2LjA3IDEzLjk1QzYuMDQgMTMuNzMgNS44NyAxMy41NiA1LjY2IDEzLjUyQzQuODIgMTMuMzcgNC4yOSAxMi42NiA0LjI5IDExLjc1QzQuMjkgMTAuODQgNC44MiAxMC4xMyA1LjY2IDkuOThDNS44NyA5Ljk0IDYuMDQgOS43NyA2LjA3IDkuNTVaIi8+PC9zdmc+',
+        
+        // Module Icons
+        bolt: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI1ZjRmNCI+PHBhdGggZD0iTTExIDIxaC0xbDEtN0g3LjVjLS41OCAwLS41Ny0uMzItLjM4LS42Ni4xOS0uMzQuMDUtLjA4LjA3LS4xMkM4LjQ4IDEwLjk0IDEwLjQyIDcuNTQgMTMgM2gxcy0xIDdoMy41Yy40OSAwIC41Ni4zMy40Ny41MWwtLjA3LjE1QzEyLjk2IDE3LjU1IDExIDIxIDExIDIxeiIvPjwvc3ZnPg==',
+        
+        gamepad: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzI1ZjRmNCI+PHBhdGggZD0iTTIxIDZIM2MtMS4xIDAtMiAuOS0yIDJ2OGMwIDEuMS45IDIgMiAyaDE4YzEuMSAwIDItLjkgMi0yVjhjMC0xLjEtLjktMi0yLTJ6bS0xMCA3SDh2M0g2di0zSDN2LTJoM1Y4aDJ2M2gzdjJ6bTQuNSAyYy0uODMgMC0xLjUtLjY3LTEuNS0xLjVzLjY3LTEuNSAxLjUtMS41IDEuNS42NyAxLjUgMS41LS42NyAxLjUtMS41IDEuNXptNC0zYy0uODMgMC0xLjUtLjY3LTEuNS0xLjVTMTguNjcgOSAxOS41IDlzMS41LjY3IDEuNSAxLjUtLjY3IDEuNS0xLjUgMS41eiIvPjwvc3ZnPg==',
 
+        smartphone: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzlkMDBmZiI+PHBhdGggZD0iTTE3IDEuMDFMNCAxYy0xLjEgMC0yIC45LTIgMnYxOGMwIDEuMS45IDIgMiAyaDEzYzEuMSAwIDItLjkgMi0yVjNjMC0xLjEtLjktMS45OS0yLTEuOTl6TTE3IDE5SDVWNWgxMnYxNHoiLz48L3N2Zz4=',
 
-
-        psychology: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%239d00ff%22%3E%3Cpath d%3D%22M18.85 10.39c.31-.77.12-1.66-.46-2.23-.58-.57-1.46-.76-2.23-.46-1.54.6-2.61 2.08-2.61 3.8h-2c0-2.8 1.76-5.22 4.28-6.19 1.18-.46 2.49-.24 3.49.56 1 .81 1.57 2.01 1.55 3.28-.02 1.27-.64 2.43-1.66 3.12-.99.67-1.6 1.77-1.6 2.93h-2c0-1.78.96-3.41 2.5-4.42.36-.23.64-.53.74-.83zM13 18h-2v2h2v-2zm-1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM6 12c0 1.23.36 2.38.98 3.36l1.7-1.7c-.43-.49-.68-1.12-.68-1.81 0-1.51 1.23-2.73 2.74-2.73.54 0 1.05.16 1.48.44l1.62-1.62C13.06 7.37 12.06 7 11 7c-2.76 0-5 2.24-5 5z%22%2F%3E%3C%2Fsvg%3E',
-        sensors: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2310b981%22%3E%3Cpath d%3D%22M11 22v-6h2v6h-2zm-4-3v-3h2v3H7zm8 0v-3h2v3h-2zm-8-5v-3h2v3H7zm8 0v-3h2v3h-2zM6 9c0-3.31 2.69-6 6-6s6 2.69 6 6v3h-2V9c0-2.21-1.79-4-4-4s-4 1.79-4 4v3H6V9z%22%2F%3E%3C%2Fsvg%3E',
-        vital: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22none%22 stroke%3D%22%23f42525%22 stroke-width%3D%222%22 stroke-linecap%3D%22round%22 stroke-linejoin%3D%22round%22%3E%3Cpath d%3D%22M22 12h-4l-3 9L9 3l-3 9H2%22%2F%3E%3C%2Fsvg%3E',
-        play: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%239d00ff%22%3E%3Cpath d%3D%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z%22%2F%3E%3C%2Fsvg%3E',
-        target: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2310b981%22%3E%3Cpath d%3D%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-12c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z%22%2F%3E%3C%2Fsvg%3E',
-        film: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22%3E%3Cpath fill%3D%22%239d00ff%22 d%3D%22M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-2z%22%2F%3E%3Cpath fill%3D%22%23ffffff%22 d%3D%22M9.5 10v5l4-2.5z%22%2F%3E%3C%2Fsvg%3E',
-        scope: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2310b981%22%3E%3Cpath d%3D%22M20.94 11c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z M12 10a2 2 0 1 0 0 4 2 2 0 1 0 0-4z%22%2F%3E%3C%2Fsvg%3E',
-        power: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%23f42525%22%3E%3Cpath d%3D%22M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4zm-1.67 16h-4v-14h4v14z%22%2F%3E%3Cpath d%3D%22M10 14h4v6h-4z%22 opacity%3D%220.3%22%2F%3E%3C%2Fsvg%3E'
+        psychology: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzlkMDBmZiI+PHBhdGggZD0iTTE4Ljg1IDEwLjM5Yy4zMS0uNzcuMTItMS42Ni0uNDYtMi4yMy0uNTgtLjU3LTEuNDYtLjc2LTIuMjMtLjQ2LTEuNTQuNi0yLjYxIDIuMDgtMi42MSAzLjhoLTJjMC0yLjggMS43Ni01LjIyIDQuMjgtNi4xOSAxLjE4LS40NiAyLjQ5LS4yNCAzLjQ5LjU2IDEgLjgxIDEuNTcgMi4wMSAxLjU1IDMuMjgtLjAyIDEuMjctLjY0IDIuNDMtMS42NiAzLjEyLS45OS42Ny0xLjYgMS43Ny0xLjYgMi45M2gtMmMwLTEuNzguOTYtMy40MSAyLjUtNC40Mi4zNi0uMjMuNjQtLjUzLjc0LS44M3pNMTMgMThoLTJ2Mmgydi0yem0tMS0xNkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMCAxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptMCAxOGMtNC40MSAwLTgtMy41OS04LThzMy41OS04IDgtOCA4IDMuNTkgOCA4LTMuNTkgOC04IDh6TTYgMTJjMCAxLjIzLjM2IDIuMzguOTggMy4zNmwxLjctMS43Yy0uNDMtLjQ5LS42OC0xLjEyLS42OC0xLjgxIDAtMS41MSAxLjIzLTIuNzMgMi43NC0yLjczLjU0IDAgMS4wNS4xNiAxLjQ4LjQ0bDEuNjItMS42MkMxMy4wNiA3LjM3IDEyLjA2IDcgMTEgN2MtMi43NiAwLTUgMi4yNC01IDV6Ii8+PC9zdmc+',
+        
+        sensors: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzEwYjk4MSI+PHBhdGggZD0iTTExIDIydi02aDJ2NmgtMnptLTQtM3YtM2gydjNIN3ptOCAwdi0zaDJ2M2gtMnptLTgtNXYtM2gydjNIN3ptOCAwdi0zaDJ2M2gtMnpNNiA5YzAtMy4zMSAyLjY5LTYgNi02czYgMi42OSA2IDZ2M2gtMlY5YzAtMi4yMS0xLjc5LTQtNC00cy00IDEuNzktNCA0djNINlY5eiIvPjwvc3ZnPg==',
+        
+        vital: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjQyNTI1IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIyIDEyaC00bC0zIDlMOSAzbC0zIDlIMiIvPjwvc3ZnPg==',
+        
+        play: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzlkMDBmZiI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bS0yIDE0LjV2LTlsNiA0LjUtNiA0LjV6Ii8+PC9zdmc+',
+        
+        target: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzEwYjk4MSI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTAgMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bTAgMThjLTQuNDEgMC04LTMuNTktOC04czMuNTktOCA4LTggOCAzLjU5IDggOC0zLjU5IDgtOCA4em0wLTEyYy0yLjIxIDAtNCAxLjc5LTQgNHMxLjc5IDQgNCA0IDQtMS43OSA0LTQtMS43OS00LTQtNHoiLz48L3N2Zz4=',
+        
+        film: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iIzlkMDBmZiIgZD0iTTE4IDRsMiA0aC0zbC0yLTRoLTJsMiA0aC0zbC0yLTRIOGwyIDRIN0w1IDRINGMtMS4xIDAtMS45OS45LTEuOTkgMkwyIDE4YzAgMS4xLjkgMiAyIDJoMTZjMS4xIDAgMi0uOSAyLTJWNmMwLTEuMS0uOS0yLTItMmgtMnoiLz48cGF0aCBmaWxsPSIjZmZmZmZmIiBkPSJNOS41IDEwdjVsNC0yLjV6Ii8+PC9zdmc+',
+        
+        scope: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzEwYjk4MSI+PHBhdGggZD0iTTIwLjk0IDExYy0uNDYtNC4xNy0zLjc3LTcuNDgtNy45NC03Ljk0VjFoLTJ2Mi4wNkM2LjgzIDMuNTIgMy41MiA2LjgzIDMuMDYgMTFIMXYyaDIuMDZjLjQ2IDQuMTcgMy43NyA3LjQ4IDcuOTQgNy45NFYyM2gydi0yLjA2YzQuMTctLjQ2IDcuNDgtMy43NyA3Ljk0LTcuOTRIMjN2LTJoLTIuMDZ6TTEyIDE5Yy0zLjg3IDAtNy0zLjEzLTctN3MzLjEzLTcgNy03IDcgMy4xMyA3IDctMy4xMyA3LTcgN3ogTTEyIDEwYTIgMiAwIDEgMCAwIDQgMiAyIDAgMSAwIDAtNHoiLz48L3N2Zz4=',
+        
+        // Low Battery (Red)
+        power: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2Y0MjUyNSI+PHBhdGggZD0iTTE3IDUuMzNDMTcgNC42IDE2LjQgNCAxNS42NyA0SDE0VjJoLTR2Mkg4LjMzQzcuNiA0IDcgNC42IDcgNS4zM1YxN2gxMFY1LjMzeiIgZmlsbC1vcGFjaXR5PSIwLjMiLz48cGF0aCBkPSJNNyAxN2gxMHYzLjY3YzAgLjc0LS42IDEuMzMtMS4zMyAxLjMzSDguMzNjLS43NCAwLTEuMzMtLjYtMS4zMy0xLjMzVjE3eiIvPjwvc3ZnPg=='
       },
       // 5大痛点板块（家长视角：医疗警告风 + 直击痛点）
       modules: [
@@ -161,7 +180,7 @@ export default {
   },
   created() {
     this.modules[0].image = this.icons.gamepad;
-    this.modules[1].image = this.icons.film;
+    this.modules[1].image = this.icons.film; // Changed back to film per user request
     this.modules[2].image = this.icons.scope;
     this.modules[3].image = this.icons.vital;
     this.modules[4].image = this.icons.power;
@@ -205,6 +224,8 @@ export default {
           url: '/pages/onboarding/calibration',
           fail: (err) => {
             console.error('[Navigation] Failed to navigate to calibration:', err);
+            // Clear redirect if navigation fails
+            uni.removeStorageSync('calibration_redirect');
             uni.showToast({ title: '跳转失败: 基础档案页', icon: 'none' });
           }
         });
@@ -221,6 +242,8 @@ export default {
             title: '跳转失败: ' + (err.errMsg || '未知错误'),
             icon: 'none'
           });
+          // Clear any stale redirects just in case
+          uni.removeStorageSync('calibration_redirect');
         }
       });
     },
@@ -275,7 +298,7 @@ export default {
 
 .cards-container {
   /* Push content down further */
-  padding: calc(var(--status-bar-height) + 140rpx) 30rpx 40rpx 30rpx;
+  padding: 20rpx 30rpx 40rpx 30rpx;
 }
 
 /* Cyber Card */
@@ -380,8 +403,8 @@ export default {
 }
 
 .card-right {
-  width: 160rpx;
-  height: 160rpx;
+  width: 100rpx;
+  height: 100rpx;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -426,5 +449,46 @@ export default {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* Header Styles */
+.header-section {
+  padding: calc(var(--status-bar-height) + 100rpx) 30rpx 20rpx;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.header-icon-box {
+  width: 80rpx;
+  height: 80rpx;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-icon {
+  width: 50rpx;
+  height: 50rpx;
+}
+
+.header-text-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.header-subtitle {
+  font-size: 24rpx;
+  color: #94a3b8;
+  letter-spacing: 1px;
 }
 </style>

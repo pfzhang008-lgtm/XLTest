@@ -160,34 +160,10 @@ const handleSelect = (option) => {
       selectedOptionId.value = null;
       isTransitioning.value = false;
     } else {
-      // Finish - Trigger Fake Loading
-      triggerFakeLoading();
-    }
-  }, 300); 
-};
-
-const triggerFakeLoading = () => {
-  isAnalyzing.value = true;
-  const messages = [
-    '正在整合多维硬件测算数据...',
-    '正在解析家庭行为观察量表...',
-    '正在执行系统级交叉比对...',
-    '生成临床诊断档案...'
-  ];
-  
-  let step = 0;
-  loadingText.value = messages[0];
-  
-  const interval = setInterval(() => {
-    step++;
-    if (step < messages.length) {
-      loadingText.value = messages[step];
-    } else {
-      clearInterval(interval);
-      // Emit results
+      // Finish - Directly emit results without fake loading
       emit('finish', answers.value);
     }
-  }, 1000);
+  }, 300); 
 };
 </script>
 

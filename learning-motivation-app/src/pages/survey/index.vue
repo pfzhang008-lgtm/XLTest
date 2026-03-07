@@ -27,11 +27,16 @@ import surveyExam from '@/data/survey_exam_anxiety.json';
 const currentSurveyData = ref(null);
 const surveyType = ref('');
 const moduleId = ref('');
+const currentStep = ref(1);
 
 onLoad((options) => {
   console.log('[SurveyPage] onLoad with options:', options);
   if (options.moduleId) {
     moduleId.value = options.moduleId;
+  }
+  
+  if (options.step) {
+    currentStep.value = parseInt(options.step);
   }
   
   if (options.type) {
@@ -139,6 +144,10 @@ const handleFinish = (answers) => {
   if (targetModuleId) {
     uni.setStorageSync('module_' + targetModuleId + '_survey_completed', true);
     uni.setStorageSync('module_' + targetModuleId + '_survey_data', answers);
+    
+    // Update pipeline step
+    const nextStep = currentStep.value + 1;
+    uni.setStorageSync(`module_${targetModuleId}_current_step`, nextStep);
   }
   
   // Navigate back to the landing page to start the objective assessment

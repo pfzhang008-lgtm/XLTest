@@ -152,6 +152,7 @@ export default {
       maxRounds: 5,
       config: null, // Dynamic configuration
       moduleId: '01', // Default
+      step: 1,
       
       // Hardware Monitor Data
       fps: 60.0,
@@ -187,8 +188,56 @@ export default {
     }
   },
   onLoad(options) {
-    if (options.moduleId) {
+    // 1. Try options
+    if (options && options.moduleId) {
       this.moduleId = options.moduleId;
+      console.log('PVT: Set moduleId from options:', this.moduleId);
+    }
+    
+    if (options && options.step) {
+      const parsedStep = parseInt(options.step);
+      if (!isNaN(parsedStep)) {
+        this.step = parsedStep;
+        console.log('PVT: Set step from options:', this.step);
+      } else {
+        console.warn('PVT: Invalid step option, defaulting to 1');
+        this.step = 1;
+      }
+    }
+
+    // 2. Fallback to GlobalData
+    if (!options || !options.moduleId) {
+       const app = getApp();
+       if (app && app.globalData && app.globalData.activeModuleId) {
+         this.moduleId = app.globalData.activeModuleId;
+         console.warn('PVT: Recovered moduleId from GlobalData:', this.moduleId);
+         
+         if (app.globalData.activeStep) {
+           const globalStep = parseInt(app.globalData.activeStep);
+           if (!isNaN(globalStep)) {
+             this.step = globalStep;
+             console.warn('PVT: Recovered step from GlobalData:', this.step);
+           }
+         }
+       }
+    }
+
+    // 3. Fallback to Storage (Last Resort)
+    if ((!this.moduleId || this.moduleId === '01') && (!options || !options.moduleId)) {
+       const lastModuleId = uni.getStorageSync('last_active_module_id');
+       if (lastModuleId) {
+         this.moduleId = lastModuleId;
+         console.warn('PVT: Recovered moduleId from Storage:', this.moduleId);
+         
+         const lastStep = uni.getStorageSync('last_active_step');
+         if (lastStep) {
+            const storageStep = parseInt(lastStep);
+            if (!isNaN(storageStep)) {
+               this.step = storageStep;
+               console.warn('PVT: Recovered step from Storage:', this.step);
+            }
+         }
+       }
     }
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
@@ -407,27 +456,83 @@ export default {
     },
     
     completeTest() {
-      // Calculate Average Reaction Time
-      const avgReactionTime = this.reactionTimes.length > 0 
-        ? this.reactionTimes.reduce((a, b) => a + b, 0) / this.reactionTimes.length 
-        : 0;
+      try {
+        uni.showLoading({ title: '保存中...', mask: true });
+        
+        // Calculate Average Reaction Time
+        const avgReactionTime = this.reactionTimes.length > 0 
+          ? this.reactionTimes.reduce((a, b) => a + b, 0) / this.reactionTimes.length 
+          : 0;
 
-      const resultPayload = {
-        metrics: {
-          avgTime: Math.round(avgReactionTime),
-          errors: this.falseStartCount,
-          reactionTimes: this.reactionTimes
-        },
-        thresholds: {
-          excellentMs: this.config.excellentMs,
-          riskMs: this.config.riskMs,
-          riskFalseStarts: this.config.riskFalseStarts
+        const resultPayload = {
+          metrics: {
+            avgTime: Math.round(avgReactionTime),
+            errors: this.falseStartCount,
+            reactionTimes: this.reactionTimes
+          },
+          thresholds: {
+            excellentMs: this.config ? this.config.excellentMs : 250,
+            riskMs: this.config ? this.config.riskMs : 400,
+            riskFalseStarts: this.config ? this.config.riskFalseStarts : 3
+          }
+        };
+
+        // Save result and return to briefing
+        if (this.moduleId) {
+          // Ensure step is a valid number
+          let currentStepNum = parseInt(this.step);
+          if (isNaN(currentStepNum)) {
+             console.warn('PVT: currentStep is NaN, defaulting to 1');
+             currentStepNum = 1;
+          }
+
+          const dataKey = `module_${this.moduleId}_step_${currentStepNum}_data`;
+          const stepKey = `module_${this.moduleId}_current_step`;
+          const nextStep = currentStepNum + 1;
+          
+          console.log(`[PVT] Saving results to ${dataKey}`);
+          uni.setStorageSync(dataKey, resultPayload);
+          uni.setStorageSync(stepKey, nextStep);
+          
+          // Double check save
+          const savedData = uni.getStorageSync(dataKey);
+          if (!savedData) {
+             console.error('[PVT] CRITICAL: Data save failed immediately after setStorageSync');
+             // Retry once
+             uni.setStorageSync(dataKey, resultPayload);
+          }
+        } else {
+          console.warn('PVT: No moduleId found, skipping data save');
         }
-      };
-
-      uni.redirectTo({
-        url: `/pages/neural-link/result?moduleId=${this.moduleId}&testType=PVT&data=${encodeURIComponent(JSON.stringify(resultPayload))}`
-      });
+        
+        uni.hideLoading();
+        uni.showToast({
+          title: '测试完成',
+          icon: 'success',
+          duration: 1500
+        });
+      } catch (e) {
+        console.error('PVT: Error in completeTest', e);
+        uni.hideLoading();
+        uni.showToast({
+          title: '完成',
+          icon: 'none'
+        });
+      }
+      
+      setTimeout(() => {
+            console.log('PVT: Navigating back...');
+            const pages = getCurrentPages();
+            if (pages.length > 1) {
+              uni.navigateBack();
+            } else if (this.moduleId) {
+              uni.redirectTo({
+                url: `/pages/assessment/briefing?moduleId=${this.moduleId}`
+              });
+            } else {
+              uni.reLaunch({ url: '/pages/index/index' });
+            }
+          }, 1500);
     }
   }
 };

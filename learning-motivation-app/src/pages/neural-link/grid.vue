@@ -115,6 +115,7 @@ export default {
       FOCUS_THRESHOLD: 1500, // 1.5 seconds
       mode: '',
       moduleId: '',
+      step: 1,
       config: null,
       excellentSec: 25,
       riskSec: 45
@@ -126,6 +127,32 @@ export default {
     }
     if (options && options.moduleId) {
       this.moduleId = options.moduleId;
+    }
+    if (options && options.step) {
+      const parsedStep = parseInt(options.step);
+      if (!isNaN(parsedStep)) {
+        this.step = parsedStep;
+      } else {
+        console.warn('Grid: Invalid step option, defaulting to 1');
+        this.step = 1;
+      }
+    }
+    
+    // Fallback to GlobalData if missing
+    if (!this.moduleId) {
+       const app = getApp();
+       if (app && app.globalData && app.globalData.activeModuleId) {
+         this.moduleId = app.globalData.activeModuleId;
+         console.warn('Grid: Recovered moduleId from GlobalData:', this.moduleId);
+         
+         if (app.globalData.activeStep) {
+           const globalStep = parseInt(app.globalData.activeStep);
+           if (!isNaN(globalStep)) {
+             this.step = globalStep;
+             console.warn('Grid: Recovered step from GlobalData:', this.step);
+           }
+         }
+       }
     }
     
     // Load config based on age
@@ -331,44 +358,69 @@ export default {
     finishTest() {
       console.log('Schulte Grid: Test finished, navigating to results');
       this.clearTimers();
-      const timeStr = `${this.minutes}:${this.seconds}.${this.milliseconds}`;
-      const totalDuration = (Date.now() - this.startTime) / 1000; // seconds
       
-      // Calculate focus duration average
-      let avgFocus = 0;
-      if (this.focusSegments.length > 0) {
-        const sum = this.focusSegments.reduce((a, b) => a + b, 0);
-        avgFocus = Math.round(sum / this.focusSegments.length);
+      try {
+        uni.showLoading({ title: '保存中...', mask: true });
+        
+        const timeStr = `${this.minutes}:${this.seconds}.${this.milliseconds}`;
+        const totalDuration = (Date.now() - this.startTime) / 1000; // seconds
+        
+        // Calculate focus duration average
+        let avgFocus = 0;
+        if (this.focusSegments.length > 0) {
+          const sum = this.focusSegments.reduce((a, b) => a + b, 0);
+          avgFocus = Math.round(sum / this.focusSegments.length);
+        }
+        
+        console.log(`Schulte Grid: Results - Errors: ${this.errorCount}, AvgFocus: ${avgFocus}ms, Duration: ${totalDuration}s`);
+        
+        // Unified flow
+        const unifiedPayload = {
+            metrics: {
+                totalTime: totalDuration,
+                errors: this.errorCount,
+                avgFocus: avgFocus
+            },
+            thresholds: {
+              excellentSec: this.excellentSec,
+              riskSec: this.riskSec
+            }
+        };
+        
+        const targetModuleId = this.moduleId || '01'; // Default to 01 if missing
+
+        // Save result and return to briefing
+        uni.setStorageSync(`module_${targetModuleId}_step_${this.step}_data`, unifiedPayload);
+        uni.setStorageSync(`module_${targetModuleId}_current_step`, this.step + 1);
+
+        uni.hideLoading();
+        uni.showToast({
+          title: '测试完成',
+          icon: 'success',
+          duration: 1500
+        });
+      } catch (e) {
+        console.error('Grid: Error in finishTest', e);
+        uni.hideLoading();
+        uni.showToast({
+          title: '完成',
+          icon: 'none'
+        });
       }
       
-      console.log(`Schulte Grid: Results - Errors: ${this.errorCount}, AvgFocus: ${avgFocus}ms, Duration: ${totalDuration}s`);
-      
-      const resultPayload = {
-        metrics: {
-          totalTime: totalDuration,
-          errorCount: this.errorCount,
-          avgFocus: avgFocus
-        },
-        thresholds: {
-          excellentSec: this.excellentSec,
-          riskSec: this.riskSec
-        }
-      };
-
-      // Unified flow
-      const unifiedPayload = {
-          metrics: {
-              totalTime: totalDuration,
-              errors: this.errorCount,
-              avgFocus: avgFocus
-          }
-      };
-      
-      const targetModuleId = this.moduleId || '01'; // Default to 01 if missing
-
-      uni.navigateTo({
-          url: `/pages/neural-link/result?moduleId=${targetModuleId}&testType=Schulte&data=${encodeURIComponent(JSON.stringify(unifiedPayload))}`
-      });
+      setTimeout(() => {
+            console.log('Grid: Navigating back...');
+            const pages = getCurrentPages();
+            if (pages.length > 1) {
+              uni.navigateBack();
+            } else if (this.moduleId) {
+              uni.redirectTo({
+                url: `/pages/assessment/briefing?moduleId=${this.moduleId}`
+              });
+            } else {
+              uni.reLaunch({ url: '/pages/index/index' });
+            }
+          }, 1500);
     },
     clearTimers() {
       if (this.timerInterval) clearInterval(this.timerInterval);

@@ -3,7 +3,7 @@
     <!-- Background Elements -->
     <view class="radar-grid"></view>
     <view class="scan-line"></view>
-    
+
     <!-- Glitch Overlay Removed -->
 
     <!-- Header -->
@@ -16,7 +16,7 @@
           <text>终止</text>
         </view>
       </view>
-      
+
       <!-- Progress Bar -->
       <view class="progress-section">
         <view class="progress-label">
@@ -35,17 +35,15 @@
       <view class="ring ring-1"></view>
       <view class="ring ring-2"></view>
       <view class="ring ring-3"></view>
-      
+
       <!-- Crosshairs -->
       <view class="axis axis-x"></view>
       <view class="axis axis-y"></view>
-      
+
       <!-- Sweeping Line -->
-      <view 
-        class="radar-sweep"
+      <view class="radar-sweep"
         :style="{ animationDuration: cycleDuration + 'ms', animationPlayState: isGameActive ? 'running' : 'paused' }"
-        :key="currentTrial"
-      ></view>
+        :key="currentTrial"></view>
 
       <!-- Stimulus Display Area -->
       <view class="stimulus-container">
@@ -57,7 +55,7 @@
           </view>
         </transition>
       </view>
-      
+
 
     </view>
 
@@ -74,12 +72,8 @@
     </view>
 
     <!-- Interaction Area (Bottom) -->
-    <view 
-      class="interaction-zone"
-      @touchstart="handleTap"
-      :class="{ 'zone-active': isPressed }"
-      @touchend="isPressed = false"
-    >
+    <view class="interaction-zone" @touchstart="handleTap" :class="{ 'zone-active': isPressed }"
+      @touchend="isPressed = false">
       <view class="btn-panel">
         <view class="btn-icon-box">
           <image class="btn-icon" :src="icons.fingerprint" mode="aspectFit"></image>
@@ -94,11 +88,7 @@
     </view>
 
     <!-- Countdown Overlay -->
-    <CountdownOverlay 
-      v-if="showCountdown" 
-      offset-y="-250rpx"
-      @complete="handleCountdownComplete" 
-    />
+    <CountdownOverlay v-if="showCountdown" offset-y="-250rpx" @complete="handleCountdownComplete" />
   </view>
 </template>
 
@@ -120,7 +110,8 @@ const maxTrials = ref(40);
 const stimulusDuration = ref(800);
 const intervalMs = ref(1500); // Default interval
 const nogoProb = ref(0.15);
-const moduleId = ref('01');
+const activeModuleId = ref('');
+const step = ref(1);
 
 const currentTrial = ref(0);
 const isGameActive = ref(false);
@@ -141,6 +132,7 @@ const metrics = ref({
   omissions: 0, // Inattention
   falseAlarms: 0, // Impulsivity
   correctRejections: 0,
+  reactionTimes: [], // New: Track RTs
   events: [] // { type: 'omission'|'commission', timestamp: ms }
 });
 
@@ -153,9 +145,78 @@ let feedbackTimer = null;
 
 // --- Lifecycle ---
 onLoad((options) => {
+  // 1. Try options
   if (options && options.moduleId) {
-    moduleId.value = options.moduleId;
+    activeModuleId.value = options.moduleId;
+    console.log('SART: Set activeModuleId from options:', activeModuleId.value);
   }
+  
+  if (options && options.step) {
+    const parsedStep = parseInt(options.step);
+    if (!isNaN(parsedStep)) {
+      step.value = parsedStep;
+      console.log('SART: Set step from options:', step.value);
+    } else {
+      console.warn('SART: Invalid step option, defaulting to 1');
+      step.value = 1;
+    }
+  }
+
+  // 2. Fallback to GlobalData if missing
+  if (!activeModuleId.value) {
+    const app = getApp();
+    if (app && app.globalData && app.globalData.activeModuleId) {
+      activeModuleId.value = app.globalData.activeModuleId;
+      console.warn('SART: Recovered activeModuleId from GlobalData:', activeModuleId.value);
+      
+      if (app.globalData.activeStep) {
+        const globalStep = parseInt(app.globalData.activeStep);
+        if (!isNaN(globalStep)) {
+          step.value = globalStep;
+          console.warn('SART: Recovered step from GlobalData:', step.value);
+        }
+      }
+    }
+  }
+
+  // 2.1 Fallback to Storage (Most robust)
+  if (!activeModuleId.value) {
+    const lastId = uni.getStorageSync('last_active_module_id');
+    if (lastId) {
+      activeModuleId.value = lastId;
+      console.warn('SART: Recovered activeModuleId from Storage:', activeModuleId.value);
+      
+      const lastStep = uni.getStorageSync('last_active_step');
+      if (lastStep) {
+        const storedStep = parseInt(lastStep);
+        if (!isNaN(storedStep)) {
+          step.value = storedStep;
+          console.warn('SART: Recovered step from Storage:', step.value);
+        }
+      }
+    }
+  }
+  
+  // 3. Final Check
+  if (!activeModuleId.value) {
+    console.error('SART: Critical Error - No moduleId found');
+    uni.showModal({
+      title: '参数丢失',
+      content: '测试模块ID丢失，无法保存进度。请返回重新进入。',
+      showCancel: false,
+      success: () => uni.navigateBack()
+    });
+    return;
+  } else {
+    console.log(`[SART] Initialized with moduleId: ${activeModuleId.value}, step: ${step.value}`);
+    // Debug Toast for User Verification
+    uni.showToast({
+      title: `M:${activeModuleId.value} S:${step.value}`,
+      icon: 'none',
+      duration: 2000
+    });
+  }
+
   // Check if coming from parent survey
   let age = 18;
   const parentSurvey = uni.getStorageSync('parent_survey_result');
@@ -166,7 +227,7 @@ onLoad((options) => {
     const userProfile = uni.getStorageSync('user_profile') || {};
     age = userProfile.age || 18;
   }
-  
+
   config.value = getNormsByAge(age, 'sart');
   if (config.value) {
     maxTrials.value = config.value.totalTargets;
@@ -193,14 +254,21 @@ const goBack = () => {
 const startGame = () => {
   resetState();
   isGameActive.value = true;
-  
+
   // Start first round
   nextTrial();
 };
 
 const resetState = () => {
   currentTrial.value = 0;
-  metrics.value = { hits: 0, omissions: 0, falseAlarms: 0, correctRejections: 0, events: [] };
+  metrics.value = { 
+    hits: 0, 
+    omissions: 0, 
+    falseAlarms: 0, 
+    correctRejections: 0, 
+    reactionTimes: [], 
+    events: [] 
+  };
   currentStimulus.value = null;
   isVisible.value = false;
   hasActed.value = false;
@@ -219,10 +287,10 @@ const nextTrial = () => {
     endGame();
     return;
   }
-  
+
   // Increment trial
   currentTrial.value++;
-  
+
   // Determine Type: No-Go if random < nogoProb
   const isNoGo = Math.random() < nogoProb.value;
   if (!isNoGo) {
@@ -233,11 +301,11 @@ const nextTrial = () => {
     // No-Go Stimulus (3)
     currentStimulus.value = 3;
   }
-  
+
   hasResponded.value = false; // Reset response flag
   isVisible.value = true;
   hasActed.value = false;
-  
+
   // Only clear feedback if it wasn't a 'miss' (to let user see missed warning briefly)
   // If it was 'miss', we keep it for a short duration or until user acts
   if (feedback.value !== 'miss') {
@@ -250,15 +318,15 @@ const nextTrial = () => {
       }
     }, 800);
   }
-  
+
   const startT = Date.now();
   startTime.value = startT;
-  
+
   // Timer 1: Visual Hide (displayMs) - purely visual
   stimulusTimer = setTimeout(() => {
     isVisible.value = false;
   }, stimulusDuration.value);
-  
+
   // Timer 2: Fixed Cycle Engine (displayMs + intervalMs)
   // This is the ONLY place where nextTrial() is called recursively
   roundTimer.value = setTimeout(() => {
@@ -276,7 +344,7 @@ const handleMiss = () => {
   if (currentStimulus.value !== 3) {
     metrics.value.omissions++;
     metrics.value.events.push({ type: 'omission', timestamp: 0 });
-    feedback.value = 'miss'; 
+    feedback.value = 'miss';
   } else {
     // Correct Rejection (No-Go target appeared, user did nothing)
     metrics.value.correctRejections++;
@@ -286,19 +354,20 @@ const handleMiss = () => {
 const handleTap = () => {
   isPressed.value = true;
   if (!isGameActive.value) return;
-  
+
   // If user has already responded in this trial, ignore subsequent taps
   if (hasResponded.value) return;
   hasResponded.value = true; // Mark as responded
-  
+
   // 1. Calculate reaction time
   const reactionTime = Date.now() - startTime.value;
   hasActed.value = true;
-  
+
   // 2. Settlement
   if (currentStimulus.value !== 3) {
     // HIT (Correct) - Clicked on Non-3
     metrics.value.hits++;
+    metrics.value.reactionTimes.push(reactionTime); // Track RT for Hits
     feedback.value = 'hit';
   } else {
     // FALSE ALARM (Impulsivity) - Clicked on 3
@@ -307,7 +376,7 @@ const handleTap = () => {
     feedback.value = 'false-alarm';
     triggerPunishment();
   }
-  
+
   // CRITICAL: DO NOT clear roundTimer! 
   // DO NOT call nextTrial() here!
   // Wait for the fixed cycle timer to trigger nextTrial()
@@ -321,29 +390,163 @@ const triggerPunishment = () => {
 const endGame = () => {
   stopAllTimers();
   isGameActive.value = false;
-  
-  uni.showLoading({ title: '生成专注力报告...', mask: true });
-  
-  const resultPayload = {
-    metrics: {
-      totalTrials: maxTrials.value,
-      hits: metrics.value.hits,
-      omissions: metrics.value.omissions,
-      falseAlarms: metrics.value.falseAlarms,
-      errors: metrics.value.omissions + metrics.value.falseAlarms,
-      events: metrics.value.events
-    },
-    thresholds: {
-      excellentErrors: config.value ? config.value.excellentErrors : 0,
-      riskErrors: config.value ? config.value.riskErrors : 3
+
+  try {
+    uni.showLoading({ title: '保存中...', mask: true });
+
+    const avgRT = metrics.value.reactionTimes.length > 0 
+      ? Math.round(metrics.value.reactionTimes.reduce((a, b) => a + b, 0) / metrics.value.reactionTimes.length) 
+      : 0;
+
+    const resultPayload = {
+      metrics: {
+        totalTrials: maxTrials.value,
+        hits: metrics.value.hits,
+        omissions: metrics.value.omissions,
+        falseAlarms: metrics.value.falseAlarms,
+        correctRejections: metrics.value.correctRejections,
+        errors: metrics.value.omissions + metrics.value.falseAlarms,
+        avgTime: avgRT,
+        score: metrics.value.hits, 
+        events: metrics.value.events
+      },
+      thresholds: {
+        excellentErrors: config.value ? config.value.excellentErrors : 0,
+        riskErrors: config.value ? config.value.riskErrors : 3
+      }
+    };
+
+    // Helper for safe storage with logging
+    const safeStorageSet = (key, value) => {
+      console.log(`[SART-Storage] Attempting to set key: ${key}`);
+      try {
+        // Log value size/type
+        const valueStr = JSON.stringify(value);
+        console.log(`[SART-Storage] Value type: ${typeof value}, Length: ${valueStr.length} chars`);
+        
+        // Check Quota (approximate)
+        try {
+          const info = uni.getStorageInfoSync();
+          console.log(`[SART-Storage] Current usage: ${info.currentSize}KB, Limit: ${info.limitSize}KB`);
+          if (info.currentSize > info.limitSize * 0.9) {
+             console.warn('[SART-Storage] WARNING: Storage is over 90% full!');
+          }
+        } catch(infoErr) {
+          console.warn('[SART-Storage] Failed to get storage info:', infoErr);
+        }
+
+        uni.setStorageSync(key, value);
+        
+        // Immediate Read-Back
+        const readBack = uni.getStorageSync(key);
+        if (readBack) {
+           // Simple equality check for primitives, loose for objects
+           if (JSON.stringify(readBack) === valueStr) {
+             console.log(`[SART-Storage] SUCCESS: Key ${key} saved and verified.`);
+             return true;
+           } else {
+             console.error(`[SART-Storage] MISMATCH: Key ${key} saved but read-back value differs!`);
+             return false;
+           }
+        } else {
+           console.error(`[SART-Storage] FAILURE: Key ${key} saved but read-back is null/undefined!`);
+           return false;
+        }
+      } catch (e) {
+        console.error(`[SART-Storage] EXCEPTION setting key ${key}:`, e);
+        return false;
+      }
+    };
+
+    // Save result and return to briefing
+    if (activeModuleId.value) {
+      // Ensure step is a valid number
+      let currentStepNum = parseInt(step.value);
+      if (isNaN(currentStepNum)) {
+        console.warn('SART: currentStep is NaN, defaulting to 1');
+        currentStepNum = 1;
+      }
+
+      const dataKey = `module_${activeModuleId.value}_step_${currentStepNum}_data`;
+      const stepKey = `module_${activeModuleId.value}_current_step`;
+      const nextStep = currentStepNum + 1;
+      
+      console.log(`[SART] Saving results to ${dataKey}`);
+      console.log(`[SART] Updating step to ${nextStep} (key: ${stepKey})`);
+      
+      // Use Safe Storage Helper
+      const dataSaved = safeStorageSet(dataKey, resultPayload);
+      const stepSaved = safeStorageSet(stepKey, nextStep);
+      
+      // Retry Logic if failed
+      if (!dataSaved) {
+         console.warn('[SART] Retrying data save...');
+         safeStorageSet(dataKey, resultPayload);
+      }
+      if (!stepSaved) {
+         console.warn('[SART] Retrying step save...');
+         safeStorageSet(stepKey, nextStep);
+      }
+
+      // Final Verification & User Alert
+      const finalCheckData = uni.getStorageSync(dataKey);
+      const finalCheckStep = uni.getStorageSync(stepKey);
+      
+      if (!finalCheckData || parseInt(finalCheckStep) !== nextStep) {
+        console.error(`[SART] CRITICAL SAVE FAILURE. Data: ${!!finalCheckData}, Step: ${finalCheckStep} vs ${nextStep}`);
+        uni.showModal({
+          title: '保存异常',
+          content: `数据保存失败。\nStepKey: ${stepKey}\nDataKey: ${dataKey}\n请截图反馈。`,
+          showCancel: false
+        });
+      } else {
+        // Backup to GlobalData just in case
+        const app = getApp();
+        if (app && app.globalData) {
+          console.log('[SART] Backing up to GlobalData...');
+          app.globalData[`${dataKey}`] = resultPayload;
+          app.globalData[`${stepKey}`] = nextStep;
+          app.globalData.lastCompletedModuleId = activeModuleId.value;
+          app.globalData.lastCompletedStep = nextStep;
+        }
+      }
+    } else {
+      console.error('[SART] activeModuleId is missing, cannot save!');
+      uni.showModal({
+        title: '保存失败',
+        content: '模块ID丢失，数据无法保存。请联系管理员或重试。',
+        showCancel: false
+      });
+      return;
     }
-  };
+
+    uni.hideLoading();
+    uni.showToast({
+      title: '测试完成',
+      icon: 'success',
+      duration: 1500
+    });
+  } catch (e) {
+    console.error('SART: Error in endGame', e);
+    uni.hideLoading();
+    uni.showToast({
+      title: '完成',
+      icon: 'none'
+    });
+  }
 
   setTimeout(() => {
-    uni.hideLoading();
-    uni.redirectTo({ 
-      url: `/pages/neural-link/result?moduleId=${moduleId.value}&testType=SART&data=${encodeURIComponent(JSON.stringify(resultPayload))}` 
-    });
+    console.log('SART: Navigating back...');
+    const pages = getCurrentPages();
+    if (pages.length > 1) {
+      uni.navigateBack();
+    } else if (activeModuleId.value) {
+      uni.redirectTo({
+        url: `/pages/assessment/briefing?moduleId=${activeModuleId.value}`
+      });
+    } else {
+      uni.reLaunch({ url: '/pages/index/index' });
+    }
   }, 1500);
 };
 
@@ -375,26 +578,42 @@ const quitTest = () => {
 
 /* Background */
 .radar-grid {
-  position: absolute; inset: 0;
-  background-image: 
+  position: absolute;
+  inset: 0;
+  background-image:
     linear-gradient(rgba(239, 68, 68, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(239, 68, 68, 0.05) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
 }
+
 .scan-line {
-  position: absolute; top: 0; left: 0; right: 0; height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;
   background: linear-gradient(to bottom, transparent, rgba(239, 68, 68, 0.05), transparent);
   animation: scan 4s linear infinite;
   pointer-events: none;
 }
-@keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(100%);
+  }
+}
 
 /* Header */
 .header {
   padding: 44px 20px 20px;
   z-index: 10;
 }
+
 .back-btn {
   width: 60rpx;
   height: 60rpx;
@@ -418,93 +637,291 @@ const quitTest = () => {
   align-items: center;
   margin-bottom: 20rpx;
 }
-.status-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; position: relative; }
+
+.status-icon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
 .radar-ping {
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
   border: 2px solid #ef4444;
   border-radius: 50%;
   position: relative;
 }
+
 .radar-ping::after {
-  content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  width: 40%; height: 40%; background: #ef4444; border-radius: 50%;
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40%;
+  height: 40%;
+  background: #ef4444;
+  border-radius: 50%;
   animation: ping 1.5s infinite;
 }
-@keyframes ping { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; } }
 
-.header-info { flex: 1; margin-left: 12px; }
-.header-title { font-size: 20px; font-weight: bold; display: block; }
-.header-sub { font-size: 10px; color: #00f0ff; letter-spacing: 2px; }
-.exit-btn { font-size: 14px; color: #9ca3af; padding: 4px 8px; }
+@keyframes ping {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 1;
+  }
 
-.progress-section { margin-top: 10px; }
-.progress-label { display: flex; justify-content: space-between; font-size: 12px; color: #9ca3af; margin-bottom: 4px; }
-.text-red { color: #ef4444; font-weight: bold; animation: pulse-fast 0.5s infinite; }
-.progress-track { height: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 2px; overflow: hidden; }
-.progress-fill { height: 100%; background: linear-gradient(to right, #ef4444, #00f0ff); transition: width 1s linear; }
+  100% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+.header-info {
+  flex: 1;
+  margin-left: 12px;
+}
+
+.header-title {
+  font-size: 20px;
+  font-weight: bold;
+  display: block;
+}
+
+.header-sub {
+  font-size: 10px;
+  color: #00f0ff;
+  letter-spacing: 2px;
+}
+
+.exit-btn {
+  font-size: 14px;
+  color: #9ca3af;
+  padding: 4px 8px;
+}
+
+.progress-section {
+  margin-top: 10px;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.text-red {
+  color: #ef4444;
+  font-weight: bold;
+  animation: pulse-fast 0.5s infinite;
+}
+
+.progress-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, #ef4444, #00f0ff);
+  transition: width 1s linear;
+}
 
 /* Radar Scope */
 .radar-scope {
   position: relative;
-  width: 300px; height: 300px;
+  width: 300px;
+  height: 300px;
   margin: 20px auto;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.ring {
-  position: absolute; border-radius: 50%; border: 1px dashed rgba(239, 68, 68, 0.3);
-  top: 50%; left: 50%; transform: translate(-50%, -50%);
-}
-.ring-1 { width: 100px; height: 100px; }
-.ring-2 { width: 200px; height: 200px; opacity: 0.6; }
-.ring-3 { width: 300px; height: 300px; opacity: 0.3; border-style: solid; }
 
-.axis { position: absolute; background: rgba(239, 68, 68, 0.2); }
-.axis-x { top: 50%; left: 0; width: 100%; height: 1px; }
-.axis-y { top: 0; left: 50%; width: 1px; height: 100%; }
+.ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(239, 68, 68, 0.3);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.ring-1 {
+  width: 100px;
+  height: 100px;
+}
+
+.ring-2 {
+  width: 200px;
+  height: 200px;
+  opacity: 0.6;
+}
+
+.ring-3 {
+  width: 300px;
+  height: 300px;
+  opacity: 0.3;
+  border-style: solid;
+}
+
+.axis {
+  position: absolute;
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.axis-x {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1px;
+}
+
+.axis-y {
+  top: 0;
+  left: 50%;
+  width: 1px;
+  height: 100%;
+}
 
 .radar-sweep {
-  position: absolute; top: 50%; left: 50%; 
-  width: 150px; height: 150px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150px;
+  height: 150px;
   background: linear-gradient(90deg, transparent, rgba(239, 68, 68, 0.1));
   transform-origin: 0 0;
   animation: radar-spin 3s linear infinite;
   clip-path: polygon(0 0, 100% 0, 100% 100%);
   border-radius: 0 0 150px 0;
 }
-@keyframes radar-spin { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
 
-.decor-label { position: absolute; font-size: 10px; color: #00f0ff; background: #0f1115; padding: 2px; }
-.top { top: -10px; } .bottom { bottom: -10px; } .left { left: -20px; top: 50%; } .right { right: -20px; top: 50%; }
+@keyframes radar-spin {
+  from {
+    transform: rotate(-90deg);
+  }
+
+  to {
+    transform: rotate(270deg);
+  }
+}
+
+.decor-label {
+  position: absolute;
+  font-size: 10px;
+  color: #00f0ff;
+  background: #0f1115;
+  padding: 2px;
+}
+
+.top {
+  top: -10px;
+}
+
+.bottom {
+  bottom: -10px;
+}
+
+.left {
+  left: -20px;
+  top: 50%;
+}
+
+.right {
+  right: -20px;
+  top: 50%;
+}
 
 /* Stimulus */
 .stimulus-container {
-  position: relative; z-index: 20;
-  width: 120px; height: 120px;
-  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  z-index: 20;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
 .stimulus-icon-wrapper {
-  display: flex; flex-direction: column; align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
-.stimulus-img { width: 80px; height: 80px; margin-bottom: 8px; filter: drop-shadow(0 0 10px currentColor); }
-.threat .stimulus-img { color: #ef4444; }
-.ally .stimulus-img { color: #4ade80; }
-.stimulus-label { font-size: 14px; font-weight: bold; letter-spacing: 1px; }
-.threat .stimulus-label { color: #ef4444; text-shadow: 0 0 5px #ef4444; }
-.ally .stimulus-label { color: #4ade80; text-shadow: 0 0 5px #4ade80; }
 
-@keyframes popIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.scale-fade-enter-active, .scale-fade-leave-active { transition: all 0.2s; }
-.scale-fade-enter-from, .scale-fade-leave-to { opacity: 0; transform: scale(0.5); }
+.stimulus-img {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 0 10px currentColor);
+}
+
+.threat .stimulus-img {
+  color: #ef4444;
+}
+
+.ally .stimulus-img {
+  color: #4ade80;
+}
+
+.stimulus-label {
+  font-size: 14px;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.threat .stimulus-label {
+  color: #ef4444;
+  text-shadow: 0 0 5px #ef4444;
+}
+
+.ally .stimulus-label {
+  color: #4ade80;
+  text-shadow: 0 0 5px #4ade80;
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.scale-fade-enter-active,
+.scale-fade-leave-active {
+  transition: all 0.2s;
+}
+
+.scale-fade-enter-from,
+.scale-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.5);
+}
 
 /* Feedback Area */
 .feedback-area {
   text-align: center;
-  height: 140rpx; /* Fixed height ~70px */
+  height: 140rpx;
+  /* Fixed height ~70px */
   position: relative;
   margin-bottom: 20px;
   /* Removed flex-direction column to use absolute positioning for stability */
 }
+
 .feedback-status-wrapper {
   position: absolute;
   top: 0;
@@ -515,6 +932,7 @@ const quitTest = () => {
   align-items: center;
   justify-content: center;
 }
+
 .feedback-hint-wrapper {
   position: absolute;
   bottom: 0;
@@ -525,12 +943,35 @@ const quitTest = () => {
   align-items: center;
   justify-content: center;
 }
-.feedback-text { font-size: 16px; font-weight: bold; display: block; }
-.text-green { color: #4ade80; }
-.text-yellow { color: #facc15; }
-.placeholder { color: #9ca3af; font-size: 14px; }
-.highlight-red { color: #ef4444; font-weight: bold; }
-.instruction-text { font-size: 12px; color: #6b7280; }
+
+.feedback-text {
+  font-size: 16px;
+  font-weight: bold;
+  display: block;
+}
+
+.text-green {
+  color: #4ade80;
+}
+
+.text-yellow {
+  color: #facc15;
+}
+
+.placeholder {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.highlight-red {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.instruction-text {
+  font-size: 12px;
+  color: #6b7280;
+}
 
 /* Interaction Zone */
 .interaction-zone {
@@ -539,43 +980,110 @@ const quitTest = () => {
   background: linear-gradient(180deg, rgba(239, 68, 68, 0.05) 0%, rgba(239, 68, 68, 0.1) 100%);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 16px;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.1s;
-  position: relative; overflow: hidden;
+  position: relative;
+  overflow: hidden;
 }
+
 .zone-active {
   background: rgba(239, 68, 68, 0.2);
   transform: scale(0.98);
   border-color: rgba(239, 68, 68, 0.6);
 }
-.btn-panel { display: flex; align-items: center; gap: 16px; pointer-events: none; }
+
+.btn-panel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  pointer-events: none;
+}
+
 .btn-icon-box {
-  width: 64px; height: 64px;
+  width: 64px;
+  height: 64px;
   background: rgba(0, 0, 0, 0.3);
   border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid rgba(239, 68, 68, 0.3);
   position: relative;
   overflow: hidden;
 }
-.btn-icon { width: 32px; height: 32px; opacity: 0.8; }
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  opacity: 0.8;
+}
+
 .scan-beam {
-  position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
   background: #ef4444;
   box-shadow: 0 0 8px #ef4444;
   animation: beam-scan 1.5s linear infinite;
 }
-@keyframes beam-scan { 0% { top: 0; opacity: 0; } 50% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
 
-.btn-text-group { display: flex; flex-direction: column; }
-.btn-main-text { font-size: 20px; font-weight: bold; color: #fff; }
-.btn-sub-text { font-size: 12px; color: #00f0ff; letter-spacing: 1px; }
-.arrow-icon { width: 24px; height: 24px; opacity: 0.5; }
+@keyframes beam-scan {
+  0% {
+    top: 0;
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.btn-text-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.btn-main-text {
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.btn-sub-text {
+  font-size: 12px;
+  color: #00f0ff;
+  letter-spacing: 1px;
+}
+
+.arrow-icon {
+  width: 24px;
+  height: 24px;
+  opacity: 0.5;
+}
 
 /* Glitch Overlay (Removed) */
 /* .glitch-active, .glitch-overlay, .glitch-text, .glitch-sub removed */
 
-@keyframes pulse-fast { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes pulse-fast {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
 
 .stimulus-number {
   font-size: 80px;
@@ -583,11 +1091,18 @@ const quitTest = () => {
   font-family: 'Roboto Mono', monospace;
   text-shadow: 0 0 20px currentColor;
 }
-.text-cyan { color: #00f0ff; }
-.text-red { color: #ef4444; }
+
+.text-cyan {
+  color: #00f0ff;
+}
+
+.text-red {
+  color: #ef4444;
+}
 
 .pvt-style-hint {
-  color: #34d399; /* PVT style green (emerald-400) */
+  color: #34d399;
+  /* PVT style green (emerald-400) */
   font-size: 36rpx;
   font-weight: bold;
   letter-spacing: 1rpx;
@@ -595,8 +1110,14 @@ const quitTest = () => {
 }
 
 @keyframes pulse-slow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
 
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}
 </style>

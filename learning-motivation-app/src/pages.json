@@ -125,7 +125,7 @@
       },
       {
         "pagePath": "pages/intervention/index",
-        "text": "设置",
+        "text": "我的",
         "iconPath": "static/transparent.png",
         "selectedIconPath": "static/transparent.png"
       }

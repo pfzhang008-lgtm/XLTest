@@ -1,5 +1,9 @@
 <script>
 export default {
+  globalData: {
+    activeModuleId: '',
+    activeStep: 1
+  },
   onLaunch: function () {
     console.log('App Launch')
   },

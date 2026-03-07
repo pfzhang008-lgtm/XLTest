@@ -125,7 +125,8 @@ const icons = {
 
 // Config state
 const config = ref(null);
-const moduleId = ref('');
+const activeModuleId = ref('');
+const step = ref(1);
 const N = ref(2); // N-Back level
 const intervalMs = ref(2000);
 const displayMs = ref(500);
@@ -164,9 +165,70 @@ const progressPercent = computed(() => {
 
 // --- Lifecycle ---
 onLoad((options) => {
+  // 1. Try options
   if (options && options.moduleId) {
-    moduleId.value = options.moduleId;
+    activeModuleId.value = options.moduleId;
+    console.log('N-Back: Set activeModuleId from options:', activeModuleId.value);
   }
+  
+  if (options && options.step) {
+    const parsedStep = parseInt(options.step);
+    if (!isNaN(parsedStep)) {
+      step.value = parsedStep;
+      console.log('N-Back: Set step from options:', step.value);
+    } else {
+       console.warn('N-Back: Invalid step option, defaulting to 1');
+       step.value = 1;
+    }
+  }
+
+  // 2. Fallback to GlobalData
+  if (!activeModuleId.value) {
+     const app = getApp();
+     if (app && app.globalData && app.globalData.activeModuleId) {
+       activeModuleId.value = app.globalData.activeModuleId;
+       console.warn('N-Back: Recovered activeModuleId from GlobalData:', activeModuleId.value);
+       
+       if (app.globalData.activeStep) {
+         const globalStep = parseInt(app.globalData.activeStep);
+         if (!isNaN(globalStep)) {
+           step.value = globalStep;
+           console.warn('N-Back: Recovered step from GlobalData:', step.value);
+         }
+       }
+     }
+  }
+
+  // 2.1 Fallback to Storage (Most robust)
+  if (!activeModuleId.value) {
+    const lastId = uni.getStorageSync('last_active_module_id');
+    if (lastId) {
+      activeModuleId.value = lastId;
+      console.warn('N-Back: Recovered activeModuleId from Storage:', activeModuleId.value);
+      
+      const lastStep = uni.getStorageSync('last_active_step');
+      if (lastStep) {
+        const storedStep = parseInt(lastStep);
+        if (!isNaN(storedStep)) {
+          step.value = storedStep;
+          console.warn('N-Back: Recovered step from Storage:', step.value);
+        }
+      }
+    }
+  }
+
+  // 3. Final Check
+  if (!activeModuleId.value) {
+    console.error('N-Back: Critical Error - No moduleId found');
+    uni.showModal({
+      title: '参数丢失',
+      content: '测试模块ID丢失，无法保存进度。请返回重新进入。',
+      showCancel: false,
+      success: () => uni.navigateBack()
+    });
+    return;
+  }
+
   const userProfile = uni.getStorageSync('user_profile') || {};
   const age = userProfile.age || 18;
   config.value = getNormsByAge(age, 'nback');
@@ -214,40 +276,79 @@ const endGame = () => {
   isGameActive.value = false;
   currentActiveIndex.value = -1;
   
-  uni.showLoading({ title: '生成脑部扫描报告...', mask: true });
-  
-  // Calculate accuracy: (Hits + Correct Rejections) / Total Judgments
-  // Total Judgments = maxTrials - N (since first N are observation)
-  const totalJudgments = Math.max(1, maxTrials.value - N.value);
-  // Note: We need to be careful. currentTrial goes up to maxTrials.
-  // history.length will be maxTrials.
-  // Judgments start from index N (0-based) to maxTrials-1.
-  // Count: maxTrials - N.
-  
-  const accuracy = (score.value + correctRejections.value) / totalJudgments;
+  try {
+    uni.showLoading({ title: '保存中...', mask: true });
+    
+    // Calculate accuracy: (Hits + Correct Rejections) / Total Judgments
+    // Total Judgments = maxTrials - N (since first N are observation)
+    const totalJudgments = Math.max(1, maxTrials.value - N.value);
+    
+    const accuracy = (score.value + correctRejections.value) / totalJudgments;
 
-  const resultPayload = {
-    metrics: {
-      totalTrials: maxTrials.value,
-      level: N.value,
-      hits: score.value,
-      falseAlarms: falseAlarms.value,
-      misses: misses.value,
-      correctRejections: correctRejections.value,
-      accuracy: accuracy
-    },
-    thresholds: {
-      excellentAccuracy: config.value ? config.value.excellentAccuracy : 0.8,
-      riskAccuracy: config.value ? config.value.riskAccuracy : 0.5
+    const resultPayload = {
+      metrics: {
+        totalTrials: maxTrials.value,
+        level: N.value,
+        hits: score.value,
+        falseAlarms: falseAlarms.value,
+        misses: misses.value,
+        correctRejections: correctRejections.value,
+        accuracy: accuracy
+      },
+      thresholds: {
+        excellentAccuracy: config.value ? config.value.excellentAccuracy : 0.8,
+        riskAccuracy: config.value ? config.value.riskAccuracy : 0.5
+      }
+    };
+
+    // Save result and return to briefing
+    if (activeModuleId.value) {
+      // Ensure step is a valid number
+      let currentStepNum = parseInt(step.value);
+      if (isNaN(currentStepNum)) {
+        console.warn('N-Back: currentStep is NaN, defaulting to 1');
+        currentStepNum = 1;
+      }
+
+      const dataKey = `module_${activeModuleId.value}_step_${currentStepNum}_data`;
+      const stepKey = `module_${activeModuleId.value}_current_step`;
+      const nextStep = currentStepNum + 1;
+      
+      console.log(`[N-Back] Saving results to ${dataKey}`);
+      uni.setStorageSync(dataKey, resultPayload);
+      uni.setStorageSync(stepKey, nextStep);
+    } else {
+      console.warn('N-Back: No moduleId found, skipping data save');
     }
-  };
+
+    uni.hideLoading();
+    uni.showToast({
+      title: '测试完成',
+      icon: 'success',
+      duration: 1500
+    });
+  } catch (error) {
+    console.error('N-Back: Error in endGame:', error);
+    uni.hideLoading();
+    uni.showToast({
+      title: '完成',
+      icon: 'none'
+    });
+  }
 
   setTimeout(() => {
-    uni.hideLoading();
-    uni.redirectTo({ 
-      url: `/pages/neural-link/result?moduleId=${moduleId.value}&testType=NBack&data=${encodeURIComponent(JSON.stringify(resultPayload))}` 
-    });
-  }, 1500);
+            console.log('N-Back: Navigating back...');
+            const pages = getCurrentPages();
+            if (pages.length > 1) {
+              uni.navigateBack();
+            } else if (activeModuleId.value) {
+              uni.redirectTo({
+                url: `/pages/assessment/briefing?moduleId=${activeModuleId.value}`
+              });
+            } else {
+              uni.reLaunch({ url: '/pages/index/index' });
+            }
+          }, 1500);
 };
 
 const nextStep = () => {

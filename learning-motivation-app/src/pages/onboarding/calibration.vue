@@ -83,14 +83,16 @@ const handleCalibration = (data) => {
     const redirectUrl = uni.getStorageSync('calibration_redirect');
     if (redirectUrl) {
       uni.removeStorageSync('calibration_redirect');
-      uni.navigateTo({
+      // Use redirectTo to replace calibration page in stack, preventing loop
+      uni.redirectTo({
         url: redirectUrl,
-        fail: () => {
-          // If navigateTo fails (e.g. tabbar page), try switchTab
+        fail: (err) => {
+          console.error('Redirect failed:', err);
+          // If redirectTo fails (e.g. tabbar page), try switchTab
           uni.switchTab({
             url: redirectUrl,
             fail: () => {
-                console.error('Redirect failed', redirectUrl);
+                console.error('SwitchTab failed', redirectUrl);
                 uni.navigateBack();
             }
           });

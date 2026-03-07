@@ -83,8 +83,19 @@
 </template>
 
 <script>
-import surveyData from '../../data/survey_esports.json';
-import mod01Config from '../../data/config_mod01.json';
+import surveyEsports from '../../data/survey_esports.json';
+import surveyVideoFog from '../../data/survey_video_fog.json';
+import surveyAcademic from '../../data/survey_academic_focus.json';
+import surveyExam from '../../data/survey_exam_anxiety.json';
+import surveyMindset from '../../data/survey_study_mindset.json';
+
+const surveyMap = {
+  '01': surveyEsports,
+  '02': surveyVideoFog,
+  '03': surveyAcademic,
+  '04': surveyExam,
+  '05': surveyMindset
+};
 
 export default {
   data() {
@@ -97,11 +108,15 @@ export default {
       contentPaddingTop: 100,
       
       currentStep: 'loading', // loading, survey, handover
+      currentPipelineStep: 1,
       ageGroup: '', // low_age, high_age
       questions: [],
       currentQuestionIndex: 0,
       answers: {},
       totalScore: 0,
+      
+      // Current survey data object
+      currentSurveyData: null,
       
       // Embedded SVGs for icons
       icons: {
@@ -122,6 +137,13 @@ export default {
     if (options && options.moduleId) {
       this.moduleId = options.moduleId;
     }
+    if (options && options.step) {
+      this.currentPipelineStep = parseInt(options.step);
+    }
+    
+    // Select Survey Data based on Module ID
+    this.currentSurveyData = surveyMap[this.moduleId] || surveyEsports; // Fallback to 01
+    console.log(`[ParentSurvey] Loaded survey for Module ${this.moduleId}:`, this.currentSurveyData.title);
     
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
@@ -159,14 +181,15 @@ export default {
         icon: 'none'
       });
       setTimeout(() => {
+        // Use redirectTo to avoid stacking on top of survey page if possible, or just navigate
         uni.navigateTo({ url: '/pages/onboarding/calibration' });
       }, 1500);
     }
   },
   methods: {
     loadQuestions(group) {
-      if (surveyData.versions && surveyData.versions[group]) {
-        this.questions = surveyData.versions[group].questions;
+      if (this.currentSurveyData && this.currentSurveyData.versions && this.currentSurveyData.versions[group]) {
+        this.questions = this.currentSurveyData.versions[group].questions;
         this.currentStep = 'survey';
         this.currentQuestionIndex = 0;
       } else {
@@ -221,7 +244,7 @@ export default {
       // Save results locally
       const resultData = {
         moduleId: this.moduleId,
-        surveyId: surveyData.surveyId,
+        surveyId: this.currentSurveyData.surveyId,
         ageGroup: this.ageGroup,
         answers: this.answers,
         totalScore: this.totalScore,
@@ -241,9 +264,10 @@ export default {
       // Cache completion status
       uni.setStorageSync('module_' + this.moduleId + '_survey_completed', true);
       
-      // Initialize module state
-      uni.setStorageSync('current_module_id', this.moduleId);
-      uni.setStorageSync('current_test_step', 0);
+      // Update pipeline step
+      const nextStep = this.currentPipelineStep + 1;
+      uni.setStorageSync(`module_${this.moduleId}_current_step`, nextStep);
+      console.log(`[ParentSurvey] Pipeline advanced to step ${nextStep}`);
       
       uni.showToast({
         title: '问卷已完成',

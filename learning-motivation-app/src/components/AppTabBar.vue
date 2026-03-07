@@ -3,7 +3,7 @@
     <!-- Tab 1: Home (Cyan) -->
     <view class="tab-item" @click="switchTab('/pages/index/index')">
       <view class="icon-box" :class="{ 'active-cyan': currentTab === 'home' }">
-        <image class="tab-icon" :src="currentTab === 'home' ? icons.radarActive : icons.radar" mode="aspectFit"></image>
+        <image class="tab-icon" :src="currentTab === 'home' ? icons.homeActive : icons.home" mode="aspectFit"></image>
       </view>
       <text class="tab-label" :class="{ 'text-cyan': currentTab === 'home' }">首页</text>
       <view class="glow" v-if="currentTab === 'home'"></view>
@@ -19,11 +19,14 @@
 
     <!-- Tab 3: Expert (Gold) -->
     <view class="tab-item" @click="switchTab('/pages/intervention/index')">
-      <view class="icon-box" :class="{ 'active-gold': currentTab === 'expert' }">
-        <image class="tab-icon" :src="currentTab === 'expert' ? icons.shieldActive : icons.shield" mode="aspectFit"></image>
+      <view class="icon-box">
+        <image 
+          class="tab-icon" 
+          :src="currentTab === 'expert' ? icons.userActive : icons.user"
+          mode="aspectFit"
+        ></image>
       </view>
-      <text class="tab-label" :class="{ 'text-gold': currentTab === 'expert' }">设置</text>
-      <view class="glow gold-glow" v-if="currentTab === 'expert'"></view>
+      <text class="tab-label" :class="{ 'text-gold': currentTab === 'expert' }">我的</text>
     </view>
   </view>
 </template>
@@ -39,16 +42,16 @@ export default {
   data() {
     return {
       icons: {
-        // Cyan Radar/Activity
-        radar: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2364748b%22%3E%3Cpath d%3D%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5.5-2.5l7.51-3.27 1.77 1.77L12 20V4L8.5 7.5z%22%2F%3E%3Cpath d%3D%22M7 12h2v2H7zm4 0h2v2h-2zm4 0h2v2h-2z%22 opacity%3D%220.5%22%2F%3E%3C%2Fsvg%3E',
-        radarActive: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2300FFFF%22%3E%3Cpath d%3D%22M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z%22%2F%3E%3C%2Fsvg%3E',
+        // Home Icon (House Style)
+        home: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzY0NzQ4YiI+PHBhdGggZD0iTTEwIDIwdi02aDR2Nmg1di04aDNMMTIgMyAyIDEyaDN2OHoiLz48L3N2Zz4=',
+        homeActive: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzAwRkZGRiI+PHBhdGggZD0iTTEwIDIwdi02aDR2Nmg1di04aDNMMTIgMyAyIDEyaDN2OHoiLz48L3N2Zz4=',
         
-        // Purple Share
-        share: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2364748b%22%3E%3Cpath d%3D%22M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z%22%2F%3E%3C%2Fsvg%3E',
-        
-        // Gold Shield/Expert
-        shield: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%2364748b%22%3E%3Cpath d%3D%22M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z%22%2F%3E%3C%2Fsvg%3E',
-        shieldActive: 'data:image/svg+xml;utf8,%3Csvg xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22 viewBox%3D%220 0 24 24%22 fill%3D%22%23F59E0B%22%3E%3Cpath d%3D%22M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z%22%2F%3E%3C%2Fsvg%3E'
+        // Purple Share (Three Dots Style)
+
+        share: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjRTJFOEYwIj48cGF0aCBkPSJNMCAwaDI0djI0SDB6IiBmaWxsPSJub25lIi8+PHBhdGggZD0iTTE4IDE2LjA4Yy0uNzYgMC0xLjQ0LjMtMS45Ni43N0w4LjkxIDEyLjdjLjA1LS4yMy4wOS0uNDYuMDktLjdzLS4wNC0uNDctLjA5LS43bDcuMDUtNC4xMWMuNTQuNSAxLjI1LjgxIDIuMDQuODEgMS42NiAwIDMtMS4zNCAzLTNzLTEuMzQtMy0zLTMtMyAxLjM0LTMgM2MwIC4yNC4wNC40Ny4wOS43TDguMDQgOS44MUM3LjUgOS4zMSA2Ljc5IDkgNiA5Yy0xLjY2IDAtMyAxLjM0LTMgM3MxLjM0IDMgMyAzYy43OSAwIDEuNS0uMzEgMi4wNC0uODFsNy4xMiA0LjE2Yy0uMDUuMjEtLjA4LjQzLS4wOC42NSAwIDEuNjEgMS4zMSAyLjkyIDIuOTIgMi45MnMyLjkyLTEuMzEgMi45Mi0yLjkyYzAtMS42MS0xLjMxLTIuOTItMi45Mi0yLjkyeiIvPjwvc3ZnPg==',
+        // User/Profile Icons
+        user: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzY0NzQ4YiI+PHBhdGggZD0iTTEyIDEyYzIuMjEgMCA0LTEuNzkgNC00cy0xLjc5LTQtNC00LTQgMS43OS00IDQgMS43OSA0IDQgNHptMCAyYy0yLjY3IDAtOCAxLjM0LTggNHYyaDE2di0yYzAtMi42Ni01LjMzLTQtOC00eiIvPjwvc3ZnPg==',
+        userActive: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0Y1OUUwQiI+PHBhdGggZD0iTTEyIDEyYzIuMjEgMCA0LTEuNzkgNC00cy0xLjc5LTQtNC00LTQgMS43OS00IDQgMS43OSA0IDQgNHptMCAyYy0yLjY3IDAtOCAxLjM0LTggNHYyaDE2di0yYzAtMi42Ni01LjMzLTQtOC00eiIvPjwvc3ZnPg=='
       }
     };
   },
