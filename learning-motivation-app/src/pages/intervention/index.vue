@@ -9,7 +9,7 @@
              <image class="menu-icon" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI0Y1OUUwQiI+PHBhdGggZD0iTTMgMTcuMjVWMjFoMy43NUwxNy44MSA5Ljk0bC0zLjc1LTMuNzVMMyAxNy4yNXpNMjAuNzEgNy4wNGMuMzktLjM5LjM5LTEuMDIgMC0xLjQxbC0yLjM0LTIuMzRjLS4zOS0uMzktMS4wMi0uMzktMS40MSAwbC0xLjgzIDEuODMgMy43NSAzLjc1IDEuODMtMS44M3oiLz48L3N2Zz4=" mode="aspectFit"></image>
           </view>
           <view class="menu-content">
-            <text class="menu-title">修改基础档案</text>
+            <text class="menu-title">修改孩子基础档案</text>
             <text class="menu-sub">更新生理参数与常模匹配数据</text>
           </view>
           <view class="menu-arrow">></view>
@@ -26,7 +26,7 @@
           >
             <view class="reset-header">
               <text class="reset-title">{{ mod.title }}</text>
-              <text class="reset-subtitle">Module {{ mod.id }}</text>
+              
             </view>
             
             <view class="reset-actions">
@@ -133,14 +133,22 @@ export default {
         res.keys.forEach(key => {
           // Check if key belongs to this module
           if (key.startsWith(prefix)) {
-            // If keepSurvey is true, SKIP the survey key
-            if (keepSurvey && key === surveyKey) {
+            // If keepSurvey is true, SKIP survey-related keys
+            if (keepSurvey && key.includes('_survey_')) {
               return;
             }
             uni.removeStorageSync(key);
             count++;
           }
         });
+        
+        // If keeping survey, restore step to 2 (if survey completed)
+        if (keepSurvey) {
+           const isCompleted = uni.getStorageSync(surveyKey);
+           if (isCompleted) {
+             uni.setStorageSync(`${prefix}_current_step`, 2);
+           }
+        }
         
         console.log(`[Reset] Cleared ${count} keys for Module ${moduleId} (Keep Survey: ${keepSurvey})`);
         

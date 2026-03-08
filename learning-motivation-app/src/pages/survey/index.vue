@@ -86,9 +86,24 @@ const loadSurveyData = (type) => {
     // Check for age-specific versions
     if (rawData.versions) {
       const userProfile = uni.getStorageSync('user_profile') || {};
-      const age = userProfile.age ? parseInt(userProfile.age) : 12; // Default to 12 (low_age) if not set
+      const age = userProfile.age || 12;
+      let ageGroup = 'low_age'; // Default
+
+      if (typeof age === 'string' && age.startsWith('age_')) {
+         if (age === 'age_6_9' || age === 'age_10_12') {
+           ageGroup = 'low_age';
+         } else {
+           ageGroup = 'high_age';
+         }
+      } else {
+         // Legacy numeric
+         const numericAge = parseInt(age);
+         if (!isNaN(numericAge) && numericAge > 12) {
+           ageGroup = 'high_age';
+         }
+      }
       
-      const versionKey = age <= 12 ? 'low_age' : 'high_age';
+      const versionKey = ageGroup;
       const versionData = rawData.versions[versionKey];
       
       console.log(`[SurveyPage] Loading ${versionKey} version for age ${age}`);

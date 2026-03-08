@@ -5,11 +5,8 @@
     <!-- Clinical Monitor Header (Fixed) -->
     <view class="cyber-header" :style="{ paddingTop: (statusBarHeight || 20) + 'px' }">
       <view class="header-content">
-        <text class="sys-title">NEURO-SYNC</text>
-        <view class="sys-status">
-          <view class="status-dot pulse"></view>
-          <text class="status-text">SYSTEM ONLINE</text>
-        </view>
+        <text class="sys-title">SYSTEM ONLINE</text>
+ 
       </view>
     </view>
 
@@ -219,6 +216,14 @@ export default {
     const status = uni.getStorageSync('is_calibrated');
     this.isCalibrated = !!status; // Convert to boolean
     console.log('[System] Index onShow - Calibration Status:', this.isCalibrated);
+
+    // Force Redirect to Calibration if not set (First time entry)
+    if (!this.isCalibrated) {
+      console.log('[System] User not calibrated, forcing redirect to calibration.');
+      uni.navigateTo({
+        url: '/pages/onboarding/calibration?mode=force'
+      });
+    }
   },
   onShareAppMessage() {
     return {

@@ -219,13 +219,19 @@ onLoad((options) => {
 
   // Check if coming from parent survey
   let age = 18;
-  const parentSurvey = uni.getStorageSync('parent_survey_result');
-  if (parentSurvey && parentSurvey.ageGroup) {
-    if (parentSurvey.ageGroup === 'low_age') age = 10;
-    else if (parentSurvey.ageGroup === 'high_age') age = 15;
-  } else {
-    const userProfile = uni.getStorageSync('user_profile') || {};
-    age = userProfile.age || 18;
+  
+  // 1. Try User Profile (Highest Priority)
+  const userProfile = uni.getStorageSync('user_profile');
+  if (userProfile && userProfile.age) {
+    age = userProfile.age;
+  } 
+  // 2. Fallback to Parent Survey
+  else {
+    const parentSurvey = uni.getStorageSync('parent_survey_result');
+    if (parentSurvey && parentSurvey.ageGroup) {
+      if (parentSurvey.ageGroup === 'low_age') age = 10;
+      else if (parentSurvey.ageGroup === 'high_age') age = 15;
+    }
   }
 
   config.value = getNormsByAge(age, 'sart');

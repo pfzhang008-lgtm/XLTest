@@ -168,8 +168,16 @@ export default {
     console.log('[ParentSurvey] Loading profile:', userProfile);
     
     if (userProfile && userProfile.age) {
-      const age = parseInt(userProfile.age);
-      this.ageGroup = age <= 12 ? 'low_age' : 'high_age';
+      const age = userProfile.age;
+      
+      // Determine age group (low_age: <=12, high_age: >12)
+      if (typeof age === 'string' && age.startsWith('age_')) {
+        this.ageGroup = (age === 'age_6_9' || age === 'age_10_12') ? 'low_age' : 'high_age';
+      } else {
+        const numericAge = parseInt(age);
+        this.ageGroup = numericAge <= 12 ? 'low_age' : 'high_age';
+      }
+      
       console.log(`[ParentSurvey] Auto-detected age group: ${this.ageGroup} (Age: ${age})`);
       
       // Load questions immediately

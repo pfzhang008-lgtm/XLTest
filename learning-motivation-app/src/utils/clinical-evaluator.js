@@ -3,10 +3,18 @@ import clinicalNorms from '@/data/clinical_norms.json';
 // Helper to determine age group key
 export const getAgeGroupKey = (age) => {
   if (!age) return 'age_13_15'; // Default
-  age = parseInt(age);
-  if (age <= 9) return 'age_6_9';
-  if (age <= 12) return 'age_10_12';
-  if (age <= 15) return 'age_13_15';
+  
+  // If already a key string
+  if (typeof age === 'string' && age.startsWith('age_')) {
+    return age;
+  }
+
+  const numericAge = parseInt(age);
+  if (isNaN(numericAge)) return 'age_16_plus';
+
+  if (numericAge <= 9) return 'age_6_9';
+  if (numericAge <= 12) return 'age_10_12';
+  if (numericAge <= 15) return 'age_13_15';
   return 'age_16_plus';
 };
 

@@ -7,18 +7,24 @@ import clinicalNorms from '@/data/clinical_norms.json';
  * @returns {Object} Configuration object for the specified test.
  */
 export function getNormsByAge(age, testType) {
-  const numericAge = parseInt(age, 10);
   let ageGroupKey = 'age_16_plus'; // Default fallback
 
-  if (!isNaN(numericAge)) {
-    if (numericAge <= 9) {
-      ageGroupKey = 'age_6_9';
-    } else if (numericAge >= 10 && numericAge <= 12) {
-      ageGroupKey = 'age_10_12';
-    } else if (numericAge >= 13 && numericAge <= 15) {
-      ageGroupKey = 'age_13_15';
-    } else {
-      ageGroupKey = 'age_16_plus';
+  // Check if age is already a valid key
+  if (typeof age === 'string' && age.startsWith('age_')) {
+    ageGroupKey = age;
+  } else {
+    // Legacy numeric handling
+    const numericAge = parseInt(age, 10);
+    if (!isNaN(numericAge)) {
+      if (numericAge <= 9) {
+        ageGroupKey = 'age_6_9';
+      } else if (numericAge >= 10 && numericAge <= 12) {
+        ageGroupKey = 'age_10_12';
+      } else if (numericAge >= 13 && numericAge <= 15) {
+        ageGroupKey = 'age_13_15';
+      } else {
+        ageGroupKey = 'age_16_plus';
+      }
     }
   }
 

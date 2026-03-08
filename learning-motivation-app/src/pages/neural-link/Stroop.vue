@@ -270,13 +270,19 @@ export default {
 
     // Load User Config
     let userAge = 18;
-    const parentSurvey = uni.getStorageSync('parent_survey_result');
-    if (parentSurvey && parentSurvey.ageGroup) {
-      if (parentSurvey.ageGroup === 'low_age') userAge = 10;
-      else if (parentSurvey.ageGroup === 'high_age') userAge = 15;
-    } else {
-      const userProfile = uni.getStorageSync('user_profile') || {};
-      userAge = userProfile.age || 18;
+
+    // 1. Try User Profile (Highest Priority)
+    const userProfile = uni.getStorageSync('user_profile');
+    if (userProfile && userProfile.age) {
+      userAge = userProfile.age;
+    } 
+    // 2. Fallback to Parent Survey
+    else {
+      const parentSurvey = uni.getStorageSync('parent_survey_result');
+      if (parentSurvey && parentSurvey.ageGroup) {
+        if (parentSurvey.ageGroup === 'low_age') userAge = 10;
+        else if (parentSurvey.ageGroup === 'high_age') userAge = 15;
+      }
     }
     
     // Get norms for Stroop
