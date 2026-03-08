@@ -93,11 +93,6 @@
         </view>
       </button>
       
-      <!-- Secondary Action (Visual only as per requirements) -->
-      <button class="no-match-btn" hover-class="btn-hover-secondary">
-        <image class="btn-icon-sm" :src="icons.close" mode="aspectFit"></image>
-        <text class="btn-sub">不匹配</text>
-      </button>
     </view>
     
     <!-- Countdown Overlay -->
@@ -862,23 +857,6 @@ const goBack = () => {
 
 .btn-error .btn-content {
   background: linear-gradient(to bottom, rgba(239, 68, 68, 0.8), #ef4444);
-}
-
-.no-match-btn {
-  width: 100%;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: rgba(30, 41, 59, 0.5);
-  border: 1px solid #334155;
-  border-radius: 12px;
-}
-
-.btn-sub {
-  color: #cbd5e1;
-  font-size: 14px;
 }
 
 .btn-hover {

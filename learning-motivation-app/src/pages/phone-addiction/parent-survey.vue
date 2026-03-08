@@ -40,6 +40,7 @@
         <view class="options-list">
           <view 
             class="option-item glass-card" 
+            :class="{ 'option-selected': isSelected(option) }"
             v-for="(option, index) in currentQuestion.options" 
             :key="index"
             hover-class="option-hover"
@@ -53,28 +54,36 @@
             </view>
           </view>
         </view>
+        
+        <!-- Navigation Actions -->
+        <view class="nav-actions" v-if="currentQuestionIndex > 0">
+           <view class="prev-btn" hover-class="btn-hover" @click="prevQuestion">
+             <text>上一题</text>
+           </view>
+        </view>
       </view>
 
       <!-- Step 3: Handover -->
       <view v-if="currentStep === 'handover'" class="handover-container">
-        <view class="handover-content">
-          <image class="handover-icon" :src="icons.handover" mode="aspectFit"></image>
-          <text class="handover-title">家长部分已完成</text>
-          <text class="handover-desc">
-            接下来的测试需要由<text class="highlight">孩子独立完成</text>。
-            请确保环境安静，不要打扰或提示孩子。
-            测试结果将结合您的问卷生成最终报告。
-          </text>
-          
-          <view class="device-instruction">
-            <text class="instruction-text">请将设备移交给受测者</text>
-            <view class="pulse-circle"></view>
+        <view class="status-indicator">
+          <image class="success-icon" src="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0iTTEyIDIyQzE3LjUyMjggMjIgMjIgMTcuNTIyOCAyMiAxMkMyMiA2LjQ3NzE1IDE3LjUyMjggMiAxMiAyQzYuNDc3MTUgMiAyIDYuNDc3MTUgMiAxMkMyIDE3LjUyMjggNi40NzcxNSAyMiAxMiAyMloiIHN0cm9rZT0iIzI1ZjRmNCIgc3Ryb2tlLXdpZHRoPSIyIi8+PHBhdGggZD0iTTcgMTIuNUwxMC41IDE2TDE3IDgiIHN0cm9rZT0iIzI1ZjRmNCIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=" />
+          <text class="status-code">[ MODULE 01 COMPLETE ]</text>
+          <text class="main-title">监护人主诉已归档</text>
+        </view>
+        
+        <view class="warning-panel">
+          <view class="panel-header">
+            <text class="warning-icon">⚠</text>
+            <text class="panel-title">手机移交注意事项</text>
+          </view>
+          <view class="panel-body">
+            <text class="desc-line">接下来的神经动力学测试必须由 <text class="highlight-child">受测者本人独立完成</text>。</text>
+            <text class="desc-line sub-desc">请确保受测者处于无干扰环境，减少诊断报告失真。</text>
           </view>
         </view>
 
-        <button class="start-test-btn" hover-class="btn-hover" @click="startChildTest">
-          <text>我是受测者，开始测试</text>
-          <view class="btn-glow"></view>
+        <button class="cyber-btn" hover-class="btn-hover" @click="startChildTest">
+          <text> 确认移交设备 </text>
         </button>
       </view>
 
@@ -225,6 +234,13 @@ export default {
       }
     },
     // selectAge method removed - age is auto-detected
+    isSelected(option) {
+      if (!this.currentQuestion) return false;
+      const qId = this.currentQuestion.id;
+      const answer = this.answers[qId];
+      // Compare label as it is unique within options
+      return answer && answer.label === option.label;
+    },
     selectOption(option) {
       console.log('Selected option:', option);
       // Record answer
@@ -235,7 +251,7 @@ export default {
         label: option.label,
         dimension: this.currentQuestion.dimension
       };
-      this.totalScore += option.score;
+      // Total score is calculated at finish to allow re-answering
 
       // Next Question or Finish
       if (this.currentQuestionIndex < this.questions.length - 1) {
@@ -246,7 +262,14 @@ export default {
         this.finishSurvey();
       }
     },
+    prevQuestion() {
+      if (this.currentQuestionIndex > 0) {
+        this.currentQuestionIndex--;
+      }
+    },
     finishSurvey() {
+      // Calculate total score dynamically
+      this.totalScore = Object.values(this.answers).reduce((sum, item) => sum + item.score, 0);
       console.log('Survey finished. Total score:', this.totalScore);
       
       // Save results locally
@@ -470,128 +493,185 @@ export default {
   border-color: #25f4f4;
 }
 
-/* Handover Screen */
+.option-selected {
+  background: rgba(37, 244, 244, 0.15) !important;
+  border-color: rgba(37, 244, 244, 0.6) !important;
+}
+
+.option-selected .option-radio {
+  border-color: #25f4f4;
+  background: #25f4f4;
+}
+
+.option-selected .radio-inner {
+  width: 8px;
+  height: 8px;
+  background: #000;
+  border-radius: 50%;
+}
+
+/* Navigation Actions */
+.nav-actions {
+  margin-top: 32px;
+  display: flex;
+  justify-content: center;
+  padding-bottom: 24px;
+}
+
+.prev-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 32px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.prev-btn:active {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(0.98);
+}
+
+/* Handover Screen Refactored */
 .handover-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-top: 40px;
+  padding: 60px 20px 40px;
+  min-height: 60vh;
 }
 
-.handover-content {
-  text-align: center;
-  margin-bottom: 60px;
+.status-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 50px;
 }
 
-.handover-icon {
-  width: 80px;
-  height: 80px;
-  margin-bottom: 24px;
-  /* Placeholder if image fails */
-  background: rgba(255, 255, 255, 0.05); 
-  border-radius: 50%;
+.success-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 20px;
+  filter: drop-shadow(0 0 8px rgba(37, 244, 244, 0.5));
 }
 
-.handover-title {
-  display: block;
+.status-code {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 2px;
+  margin-bottom: 12px;
+}
+
+.main-title {
   font-size: 24px;
   font-weight: 700;
   color: #fff;
-  margin-bottom: 16px;
+  letter-spacing: 1px;
 }
 
-.handover-desc {
-  display: block;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.6;
-  max-width: 280px;
-  margin: 0 auto 30px;
-}
-
-.highlight {
-  color: #25f4f4;
-  font-weight: 600;
-}
-
-.device-instruction {
+.warning-panel {
+  width: 100%;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  padding: 24px;
+  margin-bottom: 40px;
   position: relative;
-  display: inline-block;
-  padding: 12px 24px;
-  background: rgba(37, 244, 244, 0.05);
-  border: 1px solid rgba(37, 244, 244, 0.3);
-  border-radius: 30px;
+  box-sizing: border-box;
 }
 
-.instruction-text {
+.warning-panel::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(225deg, rgba(245, 158, 11, 0.5) 50%, transparent 50%);
+  z-index: 1;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+  padding-bottom: 12px;
+}
+
+.warning-icon {
+  font-size: 18px;
+  color: #F59E0B;
+  margin-right: 8px;
+}
+
+.panel-title {
   font-size: 14px;
+  font-weight: 700;
+  color: #F59E0B;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.desc-line {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.6;
+}
+
+.highlight-child {
+  color: #25f4f4; /* Cyan */
+  font-weight: 700;
+  text-shadow: 0 0 5px rgba(37, 244, 244, 0.3);
+  margin: 0 4px;
+}
+
+.sub-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+}
+
+.cyber-btn {
+  width: 100%;
+  height: 60px;
+  background: #0f172a;
+  border: 1px solid #25f4f4;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(37, 244, 244, 0.2);
+  transition: all 0.2s ease;
+  margin-top: 20px;
+}
+
+.cyber-btn text {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 16px;
+  font-weight: 700;
   color: #25f4f4;
   letter-spacing: 1px;
 }
 
-.pulse-circle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-  height: 100%;
-  border-radius: 30px;
-  border: 1px solid #25f4f4;
-  animation: pulse 2s infinite;
-  opacity: 0;
-}
-
-@keyframes pulse {
-  0% {
-    transform: translate(-50%, -50%) scale(1);
-    opacity: 0.5;
-  }
-  100% {
-    transform: translate(-50%, -50%) scale(1.5);
-    opacity: 0;
-  }
-}
-
-.start-test-btn {
-  width: 100%;
-  height: 56px;
-  background: linear-gradient(90deg, #25f4f4, #00c3ff);
-  border-radius: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  border: none;
-}
-
-.start-test-btn text {
-  font-size: 18px;
-  font-weight: 600;
-  color: #000;
-  z-index: 1;
-}
-
-.btn-glow {
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-  animation: shine 3s infinite;
-}
-
-@keyframes shine {
-  0% { left: -100%; }
-  20% { left: 100%; }
-  100% { left: 100%; }
+.cyber-btn:active {
+  background: rgba(37, 244, 244, 0.1);
+  box-shadow: 0 0 20px rgba(37, 244, 244, 0.4);
 }
 
 .btn-hover {
-  transform: scale(0.98);
-  opacity: 0.9;
+  transform: scale(0.99);
+  opacity: 0.95;
 }
 </style>

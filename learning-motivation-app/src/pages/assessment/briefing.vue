@@ -48,23 +48,20 @@
         <view class="timeline-content glass-card">
           <view class="item-header">
             <view class="header-left">
-              <text class="item-name">{{ item.name }}</text>
-              <image v-if="item.step > currentStep" class="lock-icon" :src="icons.lock" mode="aspectFit"></image>
-            </view>
-            <view class="header-right">
-              <text class="item-time">{{ item.time }}</text>
-              <!-- Modification Button for Step 1 -->
-              <view 
-                v-if="item.step === 1 && item.role === 'parent' && currentStep === 2" 
-                class="modify-btn"
-                @click.stop="modifySurvey"
-              >
-                <text>重新修改</text>
+              <view class="title-row">
+                <text class="title-text-wrapper">
+                  <text v-if="item.role === 'parent'" class="role-tag-inline parent-tag">监护人</text>
+                  <text v-if="item.role === 'child'" class="role-tag-inline child-tag">受测者本人</text>
+                  <text class="item-name">{{ item.name }}</text>
+                </text>
               </view>
             </view>
           </view>
           
-          <text class="item-desc">{{ item.desc }}</text>
+          <text class="item-desc">
+            {{ item.desc }}
+            <text class="item-time-inline"> {{ item.time }}</text>
+          </text>
           
           <!-- Transition Text for Completed Items -->
           <view v-if="item.step < currentStep && item.transitionText" class="transition-box">
@@ -85,11 +82,6 @@
       </view>
     </view>
 
-    <!-- Warning Section -->
-    <view class="warning-box" v-if="briefingConfig">
-      <image class="warning-icon" :src="icons.alert" mode="aspectFit"></image>
-      <text class="warning-text">{{ briefingConfig.warning }}</text>
-    </view>
 
     <!-- Footer Spacer -->
     <view class="footer-spacer"></view>
@@ -166,7 +158,7 @@ export default {
       }
       
       if (this.currentStep === 2) {
-        return '家长录入完毕，交予受测者开始';
+        return '家长录入完毕，受测者开始';
       }
       
       return '进入下一阶段测试';
@@ -485,7 +477,7 @@ export default {
 
 /* Current State (Active) */
 .timeline-item.current {
-  transform: scale(1.02);
+  /* transform: scale(1.02); Removed scaling */
   z-index: 10;
 }
 
@@ -493,11 +485,12 @@ export default {
   background: rgba(6, 182, 212, 0.15); /* Cyan tint */
   border: 1px solid #06b6d4;
   box-shadow: 0 0 20px rgba(6, 182, 212, 0.2);
+  animation: breathe 3s infinite ease-in-out;
 }
 
 .timeline-item.current .item-name {
   color: #22d3ee;
-  font-size: 18px;
+  /* font-size: 18px; Keep font size consistent */
   font-weight: 700;
 }
 
@@ -590,12 +583,50 @@ export default {
   display: flex;
   align-items: center;
   flex: 1;
+  justify-content: space-between; /* Space between title/tag group and lock icon */
 }
 
-.header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+.title-row {
+  flex: 1;
+}
+
+.title-text-wrapper {
+  display: block; /* Ensure it acts as a block container for text flow */
+  line-height: 1.5;
+}
+
+/* Role Tags - Inline Version */
+.role-tag-inline {
+  display: inline-block; /* Behave like text but with box model */
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: monospace;
+  margin-right: 8px;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+  border-width: 1px;
+  border-style: solid;
+  vertical-align: middle; /* Align with text */
+  /* Remove height/line-height fixed values to flow better */
+}
+
+.parent-tag {
+  color: #22d3ee; /* Cyan-400 */
+  border-color: rgba(34, 211, 238, 0.5);
+  background: rgba(34, 211, 238, 0.1);
+}
+
+.child-tag {
+  color: #22d3ee; /* Match parent-tag color */
+  border-color: rgba(34, 211, 238, 0.5);
+  background: rgba(34, 211, 238, 0.1);
+}
+
+@keyframes breathe {
+  0% { border-color: rgba(6, 182, 212, 0.4); box-shadow: 0 0 10px rgba(6, 182, 212, 0.1); }
+  50% { border-color: rgba(6, 182, 212, 1); box-shadow: 0 0 20px rgba(6, 182, 212, 0.4); }
+  100% { border-color: rgba(6, 182, 212, 0.4); box-shadow: 0 0 10px rgba(6, 182, 212, 0.1); }
 }
 
 .item-name {
@@ -605,16 +636,12 @@ export default {
   margin-right: 8px;
 }
 
-.lock-icon {
-  width: 14px;
-  height: 14px;
-  opacity: 0.6;
-}
-
-.item-time {
+/* Inline Time Style */
+.item-time-inline {
   font-size: 12px;
-  color: #94a3b8;
-  margin-bottom: 4px;
+  color: #64748b; /* Lighter/subtler color */
+  margin-left: 6px;
+  font-weight: normal;
 }
 
 .item-desc {
@@ -658,7 +685,7 @@ export default {
   position: absolute;
   top: 0;
   right: 0;
-  padding: 4px 8px;
+  padding: 0px 2px 2px 2px;
   border-radius: 0 16px 0 8px;
 }
 

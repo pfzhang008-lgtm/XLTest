@@ -18,12 +18,11 @@ const props = defineProps({
 
 const emit = defineEmits(['complete']);
 
-const count = ref(3);
+const count = ref(5);
 const animate = ref(false);
 
 const displayValue = computed(() => {
-  if (count.value > 0) return count.value.toString();
-  return 'GO';
+  return count.value.toString();
 });
 
 onMounted(() => {
@@ -40,11 +39,7 @@ onMounted(() => {
       
       if (count.value <= 0) {
         clearInterval(timer);
-        
-        // Show "SYNC" for 400ms then emit complete
-        setTimeout(() => {
-          emit('complete');
-        }, 400);
+        emit('complete');
       }
     }, 50);
     
