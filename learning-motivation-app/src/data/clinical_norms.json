@@ -5,7 +5,8 @@
     "age_6_9": {
       "label": "儿童期 (6-9岁)",
       "pvt_config": { "maxRounds": 5, "delayMinMs": 2000, "delayMaxMs": 4000, "excellentMs": 350, "riskMs": 600, "riskFalseStarts": 3 },
-      "stroop_config": { "totalTrials": 20, "timeLimitMs": 3500, "excellentErrors": 1, "riskErrors": 5 },
+      "standard_stroop_config": { "totalTrials": 40, "timeLimitMs": 3500, "excellentErrors": 1, "riskErrors": 5 },
+      "emotional_stroop_config": { "totalTrials": 40, "timeLimitMs": 3500, "excellentErrors": 1, "riskErrors": 5 },
       "sart_config": { "totalTargets": 40, "nogoProb": 0.15, "displayMs": 500, "intervalMs": 1500,"excellentErrors": 1, "riskErrors": 3 },
       "nback_config": { "level": 2, "totalTrials": 25, "displayMs": 1500, "intervalMs": 2000, "excellentAccuracy": 0.70, "riskAccuracy": 0.40 },
       "schulte_config": { "gridSize": 25, "excellentSec": 50, "riskSec": 90 }
@@ -13,7 +14,8 @@
     "age_10_12": {
       "label": "前青春期 (10-12岁)",
       "pvt_config": { "maxRounds": 7, "delayMinMs": 1500, "delayMaxMs": 4000, "excellentMs": 280, "riskMs": 480, "riskFalseStarts": 3 },
-      "stroop_config": { "totalTrials": 30, "timeLimitMs": 2500, "excellentErrors": 1, "riskErrors": 6 },
+      "standard_stroop_config": { "totalTrials": 40, "timeLimitMs": 2500, "excellentErrors": 1, "riskErrors": 6 },
+      "emotional_stroop_config": { "totalTrials": 40, "timeLimitMs": 2500, "excellentErrors": 1, "riskErrors": 6 },
       "sart_config": { "totalTargets": 50, "nogoProb": 0.16, "displayMs": 400, "intervalMs": 1200,"excellentErrors": 1, "riskErrors": 4 },
       "nback_config": { "level": 2, "totalTrials": 30, "displayMs": 1200, "intervalMs": 1500, "excellentAccuracy": 0.80, "riskAccuracy": 0.50 },
       "schulte_config": { "gridSize": 25, "excellentSec": 25, "riskSec": 50 }
@@ -21,7 +23,8 @@
     "age_13_15": {
       "label": "青春期 (13-15岁)",
       "pvt_config": { "maxRounds": 10, "delayMinMs": 1000, "delayMaxMs": 3500, "excellentMs": 240, "riskMs": 400, "riskFalseStarts": 4 },
-      "stroop_config": { "totalTrials": 40, "timeLimitMs": 2000, "excellentErrors": 1, "riskErrors": 6 },
+      "standard_stroop_config": { "totalTrials": 50, "timeLimitMs": 2000, "excellentErrors": 1, "riskErrors": 6 },
+      "emotional_stroop_config": { "totalTrials": 50, "timeLimitMs": 2000, "excellentErrors": 1, "riskErrors": 6 },
       "sart_config": { "totalTargets": 55, "nogoProb": 0.16, "displayMs": 300,"intervalMs": 1000, "excellentErrors": 0, "riskErrors": 4 },
       "nback_config": { "level": 2, "totalTrials": 35, "displayMs": 1000, "intervalMs": 1000, "excellentAccuracy": 0.85, "riskAccuracy": 0.60 },
       "schulte_config": { "gridSize": 25, "excellentSec": 18, "riskSec": 40 }
@@ -29,7 +32,8 @@
     "age_16_plus": {
       "label": "成年前期 (16岁+)",
       "pvt_config": { "maxRounds": 10, "delayMinMs": 1000, "delayMaxMs": 3000, "excellentMs": 220, "riskMs": 350, "riskFalseStarts": 4 },
-      "stroop_config": { "totalTrials": 50, "timeLimitMs": 1500, "excellentErrors": 0, "riskErrors": 6 },
+      "standard_stroop_config": { "totalTrials": 50, "timeLimitMs": 1500, "excellentErrors": 0, "riskErrors": 6 },
+      "emotional_stroop_config": { "totalTrials": 50, "timeLimitMs": 1500, "excellentErrors": 0, "riskErrors": 6 },
       "sart_config": { "totalTargets": 60, "nogoProb": 0.15, "displayMs": 250,"intervalMs": 900, "excellentErrors": 0, "riskErrors": 4 },
       "nback_config": { "level": 2, "totalTrials": 40, "displayMs": 800, "intervalMs": 800, "excellentAccuracy": 0.90, "riskAccuracy": 0.70 },
       "schulte_config": { "gridSize": 25, "excellentSec": 15, "riskSec": 35 }

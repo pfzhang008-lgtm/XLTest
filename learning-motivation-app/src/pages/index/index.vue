@@ -1,14 +1,6 @@
 <template>
   <view class="page-container">
     <view class="scanlines"></view>
-    
-    <!-- Clinical Monitor Header (Fixed) -->
-    <view class="cyber-header" :style="{ paddingTop: (statusBarHeight || 20) + 'px' }">
-      <view class="header-content">
-        <text class="sys-title">SYSTEM ONLINE</text>
- 
-      </view>
-    </view>
 
     <!-- Main Content -->
     <scroll-view scroll-y="true" class="main-content">
@@ -19,11 +11,11 @@
         </view>
         <view class="header-text-box">
           <text class="header-title">Neuro Sync</text>
-          <text class="header-subtitle">青少年神经动力学评估系统</text>
+          <text class="header-subtitle">行为与认知分析系统</text>
         </view>
       </view>
 
-      <view class="cards-container">
+      <view class="cards-container">suo
         <view 
           v-for="(item, index) in modules" 
           :key="index"

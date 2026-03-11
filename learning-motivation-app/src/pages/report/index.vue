@@ -271,6 +271,11 @@ export default {
               displayValue = Math.round(scoreValue) + 's';
               if (norms) referenceText = `< ${norms.excellentSec}s`;
               break;
+            case 'Stroop':
+              scoreValue = data.metrics.errors || 0;
+              displayValue = Math.round(data.metrics.accuracy || 0) + '%';
+              if (norms) referenceText = `< ${norms.excellentErrors}`;
+              break;
             default:
               return;
           }

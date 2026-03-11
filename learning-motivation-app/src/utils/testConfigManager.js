@@ -35,11 +35,16 @@ export function getNormsByAge(age, testType) {
     return clinicalNorms.norms['age_16_plus'][`${testType}_config`];
   }
 
-  const configKey = `${testType}_config`;
-  const config = ageGroupData[configKey];
+  // Handle legacy 'stroop' mapping to 'standard_stroop'
+  let targetConfigKey = `${testType}_config`;
+  if (testType === 'stroop') {
+    targetConfigKey = 'standard_stroop_config';
+  }
+
+  const config = ageGroupData[targetConfigKey];
 
   if (!config) {
-    console.error(`Configuration not found for test type: ${testType} in age group: ${ageGroupKey}`);
+    console.error(`Configuration not found for test type: ${testType} (key: ${targetConfigKey}) in age group: ${ageGroupKey}`);
     return {};
   }
 

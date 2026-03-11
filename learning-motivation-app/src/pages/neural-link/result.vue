@@ -99,23 +99,23 @@ export default {
 
         case 'Stroop':
           this.testName = '认知干扰';
-          if (data.metrics.interference !== undefined) {
-             // Emotional Stroop usually
-             this.displayScore = Math.round(data.metrics.interference);
-             this.displayUnit = 'ms';
-             this.metrics = [
-               { label: '平均反应', value: Math.round(data.metrics.avgTime || 0) + ' ms' },
-               { label: '错误数', value: (data.metrics.errors || 0) + ' 次' }
-             ];
-          } else {
-             // Standard Stroop
-             this.displayScore = Math.round(data.metrics.accuracy || 0) + '%';
-             this.displayUnit = '准确率';
-             this.metrics = [
-               { label: '平均反应', value: Math.round(data.metrics.avgTime || 0) + ' ms' },
-               { label: '正确数', value: (data.metrics.score || 0) + ' 个' }
-             ];
-          }
+          // Standard Stroop
+          this.displayScore = Math.round(data.metrics.accuracy || 0) + '%';
+          this.displayUnit = '准确率';
+          this.metrics = [
+            { label: '平均反应', value: Math.round(data.metrics.avgTime || 0) + ' ms' },
+            { label: '正确数', value: (data.metrics.score || 0) + ' 个' }
+          ];
+          break;
+
+        case 'EmotionalStroop':
+          this.testName = '情绪阻滞';
+          this.displayScore = Math.round(data.metrics.interference || 0);
+          this.displayUnit = 'ms';
+          this.metrics = [
+            { label: '平均反应', value: Math.round(data.metrics.avgTime || 0) + ' ms' },
+            { label: '错误数', value: (data.metrics.errors || 0) + ' 次' }
+          ];
           break;
 
         case 'SART':
@@ -169,7 +169,8 @@ export default {
       let url = '';
       switch (this.testType) {
         case 'PVT': url = '/pages/neural-link/PVT'; break;
-        case 'Stroop': url = '/pages/neural-link/Stroop'; break;
+        case 'Stroop': url = '/pages/neural-link/StandardStroop'; break;
+        case 'EmotionalStroop': url = '/pages/neural-link/EmotionalStroop'; break;
         case 'SART': url = '/pages/neural-link/sart'; break;
         case 'NBack': url = '/pages/neural-link/nback'; break;
         case 'Schulte': url = '/pages/neural-link/grid'; break;
@@ -179,9 +180,6 @@ export default {
         // Redirect back to test, keeping same module/step
         // Note: Using redirectTo to replace result page
         url += `?moduleId=${this.moduleId}&step=${this.step}`;
-        if (this.testType === 'Stroop' && this.testName.includes('情绪')) {
-             url += '&mode=emotional';
-        }
         uni.redirectTo({ url });
       }
     }

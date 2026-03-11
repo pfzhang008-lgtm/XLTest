@@ -27,10 +27,11 @@ export const getTestNorms = (testType, age) => {
   switch (testType) {
     case 'PVT': return norms.pvt_config;
     case 'SART': return norms.sart_config;
-    case 'Stroop': return norms.stroop_config;
+    case 'Stroop': return norms.standard_stroop_config;
+    case 'StandardStroop': return norms.standard_stroop_config;
     case 'Schulte': return norms.schulte_config;
     case 'NBack': return norms.nback_config;
-    case 'EmotionalStroop': return null; // No norms for emotional stroop in this context
+    case 'EmotionalStroop': return norms.emotional_stroop_config;
     default: return null;
   }
 };
@@ -43,14 +44,6 @@ export const getTestNorms = (testType, age) => {
  * @returns {object} { percentile: number, text: string, color: string }
  */
 export const evaluateScore = (testType, score, age) => {
-  if (testType === 'EmotionalStroop') {
-    return {
-      percentile: 0,
-      text: '已完成',
-      color: '#F59E0B' // Neutral/Completed color
-    };
-  }
-
   const norms = getTestNorms(testType, age);
   if (!norms) {
     return { percentile: 50, text: '击败了 50% 同龄人', color: '#F59E0B' };
@@ -70,7 +63,7 @@ export const evaluateScore = (testType, score, age) => {
     excellent = norms.excellentAccuracy;
     risk = norms.riskAccuracy;
     isLowerBetter = false; // Higher accuracy is better
-  } else if (testType === 'SART' || testType === 'Stroop') {
+  } else if (['SART', 'Stroop', 'StandardStroop', 'EmotionalStroop'].includes(testType)) {
     excellent = norms.excellentErrors;
     risk = norms.riskErrors;
     isLowerBetter = true; // Fewer errors is better

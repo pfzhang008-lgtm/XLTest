@@ -78,9 +78,16 @@
       }
     },
     {
-      "path": "pages/neural-link/Stroop",
+      "path": "pages/neural-link/StandardStroop",
       "style": {
         "navigationBarTitleText": "Stroop 冲突抑制测验",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/neural-link/EmotionalStroop",
+      "style": {
+        "navigationBarTitleText": "情绪阻滞测定",
         "navigationStyle": "custom"
       }
     },

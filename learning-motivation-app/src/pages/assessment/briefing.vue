@@ -321,10 +321,10 @@ export default {
           url = '/pages/neural-link/nback';
           break;
         case 'Stroop':
-          url = '/pages/neural-link/Stroop';
+          url = '/pages/neural-link/StandardStroop';
           break;
         case 'EmotionalStroop':
-          url = '/pages/neural-link/Stroop?mode=emotional';
+          url = '/pages/neural-link/EmotionalStroop';
           break;
         case 'Schulte':
           url = '/pages/neural-link/grid';

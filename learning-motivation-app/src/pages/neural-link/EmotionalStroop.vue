@@ -10,9 +10,7 @@
           <view class="nav-back" @click="goBack">
             <text class="back-arrow">←</text>
           </view>
-          
         </view>
-        <!-- Timer moved or kept with padding -->
       </view>
       
       <!-- Progress and Status Row -->
@@ -22,7 +20,7 @@
           <text class="timer-text">{{ currentRound }} / {{ maxRounds }}</text>
         </view>
         <view class="system-status">
-           <text class="status-text">SYSTEM_ACTIVE</text>
+          <text class="status-text">EMOTIONAL_PROTOCOL</text>
         </view>
       </view>
 
@@ -43,26 +41,22 @@
 
     <!-- Main Stimulus -->
     <view class="stimulus-area">
-      <view class="instruction">
-        <text>请选择字体的 </text>
-        <text class="highlight-cyan">颜色</text>
+      <!-- Crosshair for Cooling Phase -->
+      <view class="crosshair-container" v-if="showCrosshair">
+        <text class="crosshair">+</text>
       </view>
 
-      <view class="word-container" :class="{ 'floating': isFloating }">
+      <!-- Stimulus Word -->
+      <view class="word-container" :class="{ 'floating': isFloating }" v-if="!showCrosshair">
         <text 
           class="stimulus-word" 
           :style="{ color: currentInkColor, textShadow: '0 0 40rpx ' + currentInkColor + '80' }"
         >{{ currentWordText }}</text>
       </view>
-      
-      <!-- Feedback Effect -->
-      <view v-if="feedback" class="feedback-overlay" :class="feedback">
-        <text class="material-icons feedback-icon">{{ feedback === 'correct' ? 'check_circle' : 'cancel' }}</text>
-      </view>
     </view>
 
     <!-- Controls -->
-    <view class="controls-area">
+    <view class="controls-area" v-if="!showCrosshair">
       <view 
         v-for="(btn, index) in currentButtons"
         :key="index"
@@ -73,7 +67,6 @@
       >
         <view class="btn-content">
           <text class="btn-label">{{ btn.label }}</text>
-          <text class="btn-sub">{{ btn.sub }}</text>
         </view>
         <view class="btn-corner tl"></view>
         <view class="btn-corner tr"></view>
@@ -106,19 +99,8 @@
 <script>
 import CountdownOverlay from '@/components/CountdownOverlay.vue';
 import { getNormsByAge } from '@/utils/testConfigManager.js';
-import mod01Config from '@/data/config_mod01.json';
-import mod02Config from '@/data/config_mod02.json';
 import mod03Config from '@/data/config_mod03.json';
 import mod04Config from '@/data/config_mod04.json';
-import mod05Config from '@/data/config_mod05.json';
-
-const configMap = {
-  '01': mod01Config,
-  '02': mod02Config,
-  '03': mod03Config,
-  '04': mod04Config,
-  '05': mod05Config
-};
 
 export default {
   components: {
@@ -128,30 +110,26 @@ export default {
     return {
       showCountdown: true,
       statusBarHeight: 20,
-      menuButtonTop: 24, // Default
-      menuButtonHeight: 32, // Default
-      navPaddingBottom: 8, // Default
+      menuButtonTop: 24, 
+      menuButtonHeight: 32, 
+      navPaddingBottom: 8, 
       
       // Game Config
       config: null,
-      moduleId: '01',
-      step: 1,
-      maxRounds: 20,
+      moduleId: '04', // Default to 04 for Emotional
+      step: 4,
+      maxRounds: 40,
       timeLimitMs: 3000,
-      isEmotionalMode: false,
       
       currentRound: 1,
       startTime: 0,
-      totalTime: 0,
-      timer: null, // Per-trial timeout
-      displayTimer: null, // Visual countdown interval
-      displayTime: 3, // Seconds remaining for current trial
-      roundTimeout: null, // Exact timeout for the round
+      timer: null, 
+      roundTimeout: null, 
       
       // Game State
-      currentWordText: '黄',
-      currentInkColor: '#00E5FF', // Hex for Blue/Cyan
-      currentInkType: 'blue', // 'blue' or 'yellow'
+      currentWordText: '###',
+      currentInkColor: '#00E5FF', 
+      currentInkType: 'blue', 
       
       score: 0,
       errors: 0,
@@ -159,23 +137,29 @@ export default {
       roundStartTime: 0,
       
       isFloating: true,
-      feedback: null, // 'correct' | 'wrong'
+      feedback: null, 
+      
+      // State Machine
+      showCrosshair: false, // State C/D
+      
+      // Anti-desensitization history
+      recentWords: [],
       
       // Assets
-      words: ['红', '蓝', '黄'],
-      customWords: [], // For Emotional Stroop
-      neutralWords: [], // For Emotional Stroop
       colors: {
         blue: '#0099FF', // Bright Blue
         yellow: '#FFFF00', // Bright Yellow
         red: '#FF4444'     // Bright Red
       },
-      currentButtons: []
+      currentButtons: [],
+      
+      // Words
+      customWords: [],
+      neutralWords: []
     };
   },
   computed: {
     tickCount() {
-      // Limit ticks to avoid crowding, max 20 or actual rounds if less
       return Math.min(20, this.maxRounds);
     },
     progressPercent() {
@@ -183,62 +167,16 @@ export default {
     }
   },
   onLoad(options) {
-    // 1. Try options
     if (options && options.moduleId) {
       this.moduleId = options.moduleId;
-      console.log('Stroop: Set moduleId from options:', this.moduleId);
     }
-    
     if (options && options.step) {
-      const parsedStep = parseInt(options.step);
-      if (!isNaN(parsedStep)) {
-        this.step = parsedStep;
-        console.log('Stroop: Set step from options:', this.step);
-      } else {
-        console.warn('Stroop: Invalid step option, defaulting to 1');
-        this.step = 1;
-      }
-    }
-
-    // 2. Fallback to GlobalData
-    if (!options || !options.moduleId) {
-       const app = getApp();
-       if (app && app.globalData && app.globalData.activeModuleId) {
-         this.moduleId = app.globalData.activeModuleId;
-         console.warn('Stroop: Recovered moduleId from GlobalData:', this.moduleId);
-         
-         if (app.globalData.activeStep) {
-           const globalStep = parseInt(app.globalData.activeStep);
-           if (!isNaN(globalStep)) {
-             this.step = globalStep;
-             console.warn('Stroop: Recovered step from GlobalData:', this.step);
-           }
-         }
-       }
-    }
-
-    // 3. Fallback to Storage (Last Resort)
-    if ((!this.moduleId || this.moduleId === '01') && (!options || !options.moduleId)) {
-       const lastModuleId = uni.getStorageSync('last_active_module_id');
-       if (lastModuleId) {
-         this.moduleId = lastModuleId;
-         console.warn('Stroop: Recovered moduleId from Storage:', this.moduleId);
-         
-         const lastStep = uni.getStorageSync('last_active_step');
-         if (lastStep) {
-            const storageStep = parseInt(lastStep);
-            if (!isNaN(storageStep)) {
-               this.step = storageStep;
-               console.warn('Stroop: Recovered step from Storage:', this.step);
-            }
-         }
-       }
+      this.step = parseInt(options.step);
     }
 
     const sysInfo = uni.getSystemInfoSync();
     this.statusBarHeight = sysInfo.statusBarHeight || 20;
 
-    // Get Menu Button (Capsule) Info for Alignment
     // #ifdef MP-WEIXIN
     const menuButton = uni.getMenuButtonBoundingClientRect();
     this.menuButtonTop = menuButton.top;
@@ -252,32 +190,12 @@ export default {
     this.navPaddingBottom = 4;
     // #endif
 
-    // Check for Emotional Mode
-    if (options.mode === 'emotional') {
-      this.isEmotionalMode = true;
-      const currentModuleConfig = configMap[this.moduleId] || mod01Config;
-      
-      // 兼容处理：配置文件可能使用 pipeline 或 testQueue
-      const flowList = currentModuleConfig.pipeline || currentModuleConfig.testQueue || [];
-      const esConfig = flowList.find(t => t.type === 'EmotionalStroop');
-      
-      if (esConfig) {
-        this.customWords = esConfig.customWordBank || [];
-        this.neutralWords = esConfig.neutralWordBank || [];
-      }
-      uni.setNavigationBarTitle({ title: '潜意识情绪探测' });
-    }
-
     // Load User Config
     let userAge = 18;
-
-    // 1. Try User Profile (Highest Priority)
     const userProfile = uni.getStorageSync('user_profile');
     if (userProfile && userProfile.age) {
       userAge = userProfile.age;
-    } 
-    // 2. Fallback to Parent Survey
-    else {
+    } else {
       const parentSurvey = uni.getStorageSync('parent_survey_result');
       if (parentSurvey && parentSurvey.ageGroup) {
         if (parentSurvey.ageGroup === 'low_age') userAge = 10;
@@ -285,15 +203,30 @@ export default {
       }
     }
     
-    // Get norms for Stroop
-    this.config = getNormsByAge(userAge, 'stroop');
+    // Get norms for Emotional Stroop
+    this.config = getNormsByAge(userAge, 'emotional_stroop');
     
     if (this.config) {
-      this.maxRounds = this.config.totalTrials;
-      this.timeLimitMs = this.config.timeLimitMs;
+      this.maxRounds = this.config.totalTrials || 40;
+      this.timeLimitMs = this.config.timeLimitMs || 3000;
     }
+    
+    // Load Words based on Module
+    if (this.moduleId === '04') {
+      this.customWords = mod04Config.customWordBank || [];
+      this.neutralWords = mod04Config.neutralWordBank || [];
+    } else if (this.moduleId === '03') {
+      // Mod 03 Emotional Stroop is step 5 (index 4)
+      if (mod03Config.pipeline && mod03Config.pipeline[4]) {
+         this.customWords = mod03Config.pipeline[4].customWordBank || [];
+         this.neutralWords = mod03Config.pipeline[4].neutralWordBank || [];
+      }
+    }
+    
+    // If words are empty, provide fallback to avoid crash
+    if (this.customWords.length === 0) this.customWords = ["焦虑", "紧张", "害怕"];
+    if (this.neutralWords.length === 0) this.neutralWords = ["桌子", "椅子", "电脑"];
 
-    // this.startGame(); // Moved to handleCountdownComplete
     this.generateRoundData();
   },
   onUnload() {
@@ -312,34 +245,18 @@ export default {
       this.score = 0;
       this.errors = 0;
       this.reactionTimes = [];
-      // this.displayTime = 20; // Removed global timer
-      
-      this.startTime = Date.now(); // Track total session time
+      this.startTime = Date.now(); 
       this.nextRound();
     },
     
     startTimer() {
-      // Clear existing timer if any
       this.stopTimer();
-      
-      // Set display time (seconds)
-      this.displayTime = Math.ceil(this.timeLimitMs / 1000);
-      
-      // Visual Countdown
-      this.timerInterval = setInterval(() => {
-        if (this.displayTime > 0) {
-          this.displayTime--;
-        }
-      }, 1000);
-
-      // Logical Timeout
       this.roundTimeout = setTimeout(() => {
         this.handleTimeout();
       }, this.timeLimitMs);
     },
     
     stopTimer() {
-      if (this.timerInterval) clearInterval(this.timerInterval);
       if (this.roundTimeout) clearTimeout(this.roundTimeout);
     },
 
@@ -349,79 +266,63 @@ export default {
       this.feedback = 'wrong';
       uni.vibrateShort();
       
-      // Auto proceed
+      // Timeout also triggers Cooling Phase
+      this.triggerCooling();
+    },
+    
+    triggerCooling() {
+      // State C & D: Show Crosshair and wait 1200ms
+      this.showCrosshair = true;
+      
       setTimeout(() => {
+        // State E: Next Question
+        this.showCrosshair = false;
         this.currentRound++;
         this.nextRound();
-      }, 300);
+      }, 1200);
     },
     
     generateRoundData() {
-      // 1. Decide Target Ink Color
+      // 1. Decide Target Ink Color (The Correct Answer)
       const targetTypes = ['blue', 'yellow', 'red'];
       const type = targetTypes[Math.floor(Math.random() * targetTypes.length)];
       this.currentInkType = type;
       this.currentInkColor = this.colors[type];
       
-      let textType = null;
-
-      if (this.isEmotionalMode) {
-        // Emotional Mode: Mix of Emotional and Neutral words
-        const allWords = [...this.customWords, ...this.neutralWords];
-        if (allWords.length > 0) {
-          this.currentWordText = allWords[Math.floor(Math.random() * allWords.length)];
-        } else {
-          // Fallback if no words loaded
-          this.currentWordText = '###';
-        }
-        // No textType mapping for emotional words (interference is semantic/emotional, not color-conflict)
-      } else {
-        // Standard Mode
-        // 2. Decide Word Text (Distractor)
-        // Restricted to red/yellow/blue to ensure we can create a button for it.
-        const distractorWords = ['红', '黄', '蓝'];
-        this.currentWordText = distractorWords[Math.floor(Math.random() * distractorWords.length)];
+      // 2. Decide Word Text (Emotional/Neutral)
+      const allWords = [...this.customWords, ...this.neutralWords];
+      if (allWords.length > 0) {
+        // Anti-desensitization: Ensure no consecutive duplicate words (at least 2-3 words separation)
+        let candidate = allWords[Math.floor(Math.random() * allWords.length)];
+        let attempts = 0;
         
-        // Map Chinese word to color type
-        const wordToType = {
-          '红': 'red',
-          '黄': 'yellow',
-          '蓝': 'blue'
-        };
-        textType = wordToType[this.currentWordText];
+        // Check against recent words
+        const avoidCount = Math.min(3, Math.max(0, allWords.length - 1));
+        const recent = this.recentWords.slice(-avoidCount);
+        
+        while (recent.includes(candidate) && attempts < 20) {
+          candidate = allWords[Math.floor(Math.random() * allWords.length)];
+          attempts++;
+        }
+        
+        this.currentWordText = candidate;
+        this.recentWords.push(candidate);
+        if (this.recentWords.length > 5) this.recentWords.shift(); // Maintain buffer
+      } else {
+        this.currentWordText = '###';
       }
 
-      // 3. Randomize Buttons (Only 2 buttons shown at a time)
+      // 3. Setup Buttons (3 Buttons for consistency)
       const allButtons = [
-        { type: 'blue', label: '蓝色', sub: 'SYNC BLUE', class: 'blue-btn' },
-        { type: 'yellow', label: '黄色', sub: 'SYNC YELLOW', class: 'yellow-btn' },
-        { type: 'red', label: '红色', sub: 'SYNC RED', class: 'red-btn' }
+        { type: 'blue', label: '蓝色', class: 'blue-btn' },
+        { type: 'yellow', label: '黄色', class: 'yellow-btn' },
+        { type: 'red', label: '红色', class: 'red-btn' }
       ];
 
-      // Button A: Correct Answer (Ink Color)
-      const correctButton = allButtons.find(b => b.type === this.currentInkType);
-
-      // Button B: Distractor
-      let distractorButton = null;
-      
-      if (!this.isEmotionalMode && textType && textType !== this.currentInkType) {
-        // Standard Stroop: Prefer the button that matches the Text Content (Strong Distractor)
-        distractorButton = allButtons.find(b => b.type === textType);
-      }
-      
-      if (!distractorButton) {
-        // If Emotional Mode OR Text==Ink OR TextType not found
-        // Pick a random other color
-        const otherButtons = allButtons.filter(b => b.type !== this.currentInkType);
-        distractorButton = otherButtons[Math.floor(Math.random() * otherButtons.length)];
-      }
-
-      // Shuffle position
-      this.currentButtons = [correctButton, distractorButton].sort(() => Math.random() - 0.5);
+      // Fixed button order
+      this.currentButtons = allButtons;
 
       this.roundStartTime = Date.now();
-      
-      // Start Timer
       this.startTimer();
     },
 
@@ -430,21 +331,18 @@ export default {
         this.finishGame();
         return;
       }
-      
       this.roundStartTime = Date.now();
       this.feedback = null;
-      
-      // Start the per-round timer
       this.startTimer();
-      
       this.generateRoundData();
     },
     
     handleInput(inputType) {
-      if (this.showCountdown) return; // Prevent input during countdown
-      if (this.feedback) return; // Prevent double tap
+      if (this.showCountdown) return; 
+      if (this.showCrosshair) return; // Cooling phase blocks input
+      if (this.feedback) return; 
       
-      this.stopTimer(); // Stop the timer immediately on input
+      this.stopTimer();
 
       const reactionTime = Date.now() - this.roundStartTime;
       this.reactionTimes.push(reactionTime);
@@ -457,15 +355,10 @@ export default {
       } else {
         this.errors++;
         this.feedback = 'wrong';
-        // Haptic feedback
         uni.vibrateShort();
       }
       
-      // Delay for visual feedback then next round
-      setTimeout(() => {
-        this.currentRound++;
-        this.nextRound();
-      }, 300);
+      this.triggerCooling();
     },
     
     finishGame() {
@@ -479,12 +372,11 @@ export default {
           ? this.reactionTimes.reduce((a, b) => a + b, 0) / this.reactionTimes.length
           : 0;
         
-        // Standardized Payload
         const resultPayload = {
           metrics: {
             totalTrials: this.maxRounds,
             errors: this.errors,
-            score: this.score, // correct count
+            score: this.score,
             avgTime: Math.round(avgReaction),
             totalTime: totalTime
           },
@@ -495,32 +387,16 @@ export default {
           }
         };
 
-        // Save result
         if (this.moduleId) {
-          // Ensure step is a valid number
           let currentStepNum = parseInt(this.step);
-          if (isNaN(currentStepNum)) {
-             console.warn('Stroop: currentStep is NaN, defaulting to 1');
-             currentStepNum = 1;
-          }
+          if (isNaN(currentStepNum)) currentStepNum = 4; 
 
           const dataKey = `module_${this.moduleId}_step_${currentStepNum}_data`;
           const stepKey = `module_${this.moduleId}_current_step`;
           const nextStep = currentStepNum + 1;
           
-          console.log(`[Stroop] Saving results to ${dataKey}`);
           uni.setStorageSync(dataKey, resultPayload);
           uni.setStorageSync(stepKey, nextStep);
-          
-          // Double check save
-          const savedData = uni.getStorageSync(dataKey);
-          if (!savedData) {
-             console.error('[Stroop] CRITICAL: Data save failed immediately after setStorageSync');
-             // Retry once
-             uni.setStorageSync(dataKey, resultPayload);
-          }
-        } else {
-          console.warn('Stroop: No moduleId found, skipping data save');
         }
 
         uni.hideLoading();
@@ -530,25 +406,17 @@ export default {
           duration: 1500
         });
       } catch (e) {
-        console.error('Stroop: Error in finishGame', e);
+        console.error('EmotionalStroop: Error in finishGame', e);
         uni.hideLoading();
-        uni.showToast({
-          title: '完成',
-          icon: 'none'
-        });
       }
       
       setTimeout(() => {
-            console.log('Stroop: Navigating back...');
-            const pages = getCurrentPages();
-            if (pages.length > 1) {
-              uni.navigateBack();
-            } else if (this.moduleId) {
+            if (this.moduleId) {
               uni.redirectTo({
                 url: `/pages/assessment/briefing?moduleId=${this.moduleId}`
               });
             } else {
-              uni.reLaunch({ url: '/pages/index/index' });
+              uni.navigateBack();
             }
           }, 1500);
     }
@@ -596,7 +464,7 @@ page {
 /* Header */
 .header {
   padding-left: 32rpx;
-  padding-right: 32rpx; /* Ensure padding on right */
+  padding-right: 32rpx;
   z-index: 10;
   display: flex;
   flex-direction: column;
@@ -605,7 +473,6 @@ page {
 .header-top {
   display: flex;
   align-items: center;
-  /* Height is set inline */
 }
 
 .left-controls {
@@ -639,24 +506,6 @@ page {
   align-items: center;
   margin-top: 12rpx;
   margin-bottom: 24rpx;
-}
-
-.title-box {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.logo-icon {
-  color: #00E5FF;
-  font-size: 36rpx;
-}
-
-.app-title {
-  color: #00E5FF;
-  font-size: 28rpx;
-  font-weight: 700;
-  letter-spacing: 2px;
 }
 
 .timer-pill {
@@ -748,7 +597,6 @@ page {
   font-family: monospace;
 }
 
-/* Stimulus */
 .stimulus-area {
   flex: 1;
   display: flex;
@@ -756,72 +604,40 @@ page {
   align-items: center;
   justify-content: center;
   position: relative;
-  z-index: 1;
+  z-index: 20;
+  width: 100%;
 }
 
-.instruction {
-  font-size: 32rpx;
-  color: #ccc;
-  margin-bottom: 80rpx;
+.crosshair-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.highlight-cyan {
-  color: #00E5FF;
-  font-weight: bold;
-  text-shadow: 0 0 10rpx rgba(0, 229, 255, 0.5);
+.crosshair {
+  font-size: 100rpx;
+  color: #ffffff;
+  font-weight: 300;
+  transform: translateY(-180rpx);
 }
 
 .word-container {
   position: relative;
-  transition: transform 0.2s;
-}
-
-.floating {
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-20rpx); }
-}
-
-.stimulus-word {
-  font-size: 240rpx;
-  font-weight: 900;
-  line-height: 1;
-}
-
-/* Feedback Overlay */
-.feedback-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 200rpx;
-  height: 200rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  z-index: 20;
+  width: 100%;
+  height: 300rpx;
 }
 
-.correct {
-  background: rgba(16, 185, 129, 0.2);
-  border: 2px solid #10B981;
+.stimulus-word {
+  font-size: 144rpx;
+  font-weight: 900;
+  letter-spacing: 8rpx;
+  transition: all 0.2s ease;
 }
-
-.wrong {
-  background: rgba(239, 68, 68, 0.2);
-  border: 2px solid #EF4444;
-}
-
-.feedback-icon {
-  font-size: 80rpx;
-}
-
-.correct .feedback-icon { color: #10B981; }
-.wrong .feedback-icon { color: #EF4444; }
 
 /* Controls */
 .controls-area {
@@ -853,20 +669,15 @@ page {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16rpx;
+  justify-content: center;
+  gap: 0;
+  height: 100%;
 }
 
 .btn-label {
-  font-size: 102rpx;
+  font-size: 80rpx;
   font-weight: 700;
-  letter-spacing: 2px;
-}
-
-.btn-sub {
-  font-size: 18rpx;
-  font-weight: 700;
-  letter-spacing: 1px;
-  opacity: 0.8;
+  letter-spacing: 4rpx;
 }
 
 /* Blue Button Style */
@@ -875,7 +686,6 @@ page {
   border-color: rgba(0, 153, 255, 0.3);
 }
 .blue-btn .btn-label { color: #0099FF; }
-.blue-btn .btn-sub { color: #0099FF; }
 
 /* Yellow Button Style */
 .yellow-btn {
@@ -883,7 +693,6 @@ page {
   border-color: rgba(255, 255, 0, 0.3);
 }
 .yellow-btn .btn-label { color: #FFFF00; }
-.yellow-btn .btn-sub { color: #FFFF00; }
 
 /* Red Button Style */
 .red-btn {
@@ -891,7 +700,6 @@ page {
   border-color: rgba(255, 68, 68, 0.3);
 }
 .red-btn .btn-label { color: #FF4444; }
-.red-btn .btn-sub { color: #FF4444; }
 
 /* Tech Corners */
 .btn-corner {
