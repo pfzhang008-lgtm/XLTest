@@ -28,17 +28,17 @@ export function getNormsByAge(age, testType) {
     }
   }
 
-  const ageGroupData = clinicalNorms.norms[ageGroupKey];
-  
-  if (!ageGroupData) {
-    console.warn(`No norms found for age group key: ${ageGroupKey}, falling back to age_16_plus`);
-    return clinicalNorms.norms['age_16_plus'][`${testType}_config`];
-  }
-
   // Handle legacy 'stroop' mapping to 'standard_stroop'
   let targetConfigKey = `${testType}_config`;
   if (testType === 'stroop') {
     targetConfigKey = 'standard_stroop_config';
+  }
+
+  const ageGroupData = clinicalNorms.norms[ageGroupKey];
+  
+  if (!ageGroupData) {
+    console.warn(`No norms found for age group key: ${ageGroupKey}, falling back to age_16_plus`);
+    return clinicalNorms.norms['age_16_plus'][targetConfigKey];
   }
 
   const config = ageGroupData[targetConfigKey];

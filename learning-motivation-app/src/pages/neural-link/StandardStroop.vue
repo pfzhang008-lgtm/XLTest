@@ -256,13 +256,9 @@ export default {
       const distractorWords = ['红', '黄', '蓝'];
       this.currentWordText = distractorWords[Math.floor(Math.random() * distractorWords.length)];
       
-      // Map Chinese word to color type for logic
-      const wordToType = {
-        '红': 'red',
-        '黄': 'yellow',
-        '蓝': 'blue'
-      };
-      const textType = wordToType[this.currentWordText];
+      // Map Chinese word to color type for logic (unused but kept for reference if needed, or remove)
+      // const wordToType = { '红': 'red', '黄': 'yellow', '蓝': 'blue' };
+      // const textType = wordToType[this.currentWordText];
 
       // 3. Setup Buttons (Standard Stroop uses 3 choices)
       const allButtons = [
@@ -275,7 +271,7 @@ export default {
       this.currentButtons = allButtons;
 
       this.roundStartTime = Date.now();
-      this.startTimer();
+      // startTimer() removed to avoid duplicate timer start (nextRound calls it)
     },
 
     nextRound() {
@@ -326,6 +322,7 @@ export default {
         const avgReaction = this.reactionTimes.length > 0
           ? this.reactionTimes.reduce((a, b) => a + b, 0) / this.reactionTimes.length
           : 0;
+        const accuracy = this.reactionTimes.length > 0 ? ((this.score / this.maxRounds) * 100).toFixed(1) : 0;
         
         const resultPayload = {
           metrics: {
@@ -333,7 +330,8 @@ export default {
             errors: this.errors,
             score: this.score,
             avgTime: Math.round(avgReaction),
-            totalTime: totalTime
+            totalTime: totalTime,
+            accuracy: parseFloat(accuracy)
           },
           thresholds: {
             excellentErrors: this.config ? this.config.excellentErrors : 0,

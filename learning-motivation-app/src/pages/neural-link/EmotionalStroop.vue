@@ -16,7 +16,8 @@
       <!-- Progress and Status Row -->
       <view class="status-row">
         <view class="timer-pill">
-          <text class="material-icons timer-icon">format_list_bulleted</text>
+          <!-- Replaced material icon with simple text/unicode to avoid external font dependency -->
+          <text class="timer-icon">≡</text>
           <text class="timer-text">{{ currentRound }} / {{ maxRounds }}</text>
         </view>
         <view class="system-status">
@@ -323,7 +324,7 @@ export default {
       this.currentButtons = allButtons;
 
       this.roundStartTime = Date.now();
-      this.startTimer();
+      // startTimer() removed to avoid duplicate timer start (nextRound calls it)
     },
 
     nextRound() {
@@ -371,6 +372,8 @@ export default {
         const avgReaction = this.reactionTimes.length > 0
           ? this.reactionTimes.reduce((a, b) => a + b, 0) / this.reactionTimes.length
           : 0;
+        // Interference score (simplified as deviation from time limit for now, or 0 if undefined)
+        const interference = this.reactionTimes.length > 0 ? (avgReaction - (this.config ? this.config.timeLimitMs : 3000)) : 0;
         
         const resultPayload = {
           metrics: {
@@ -378,7 +381,8 @@ export default {
             errors: this.errors,
             score: this.score,
             avgTime: Math.round(avgReaction),
-            totalTime: totalTime
+            totalTime: totalTime,
+            interference: Math.round(interference)
           },
           thresholds: {
             excellentErrors: this.config ? this.config.excellentErrors : 0,
@@ -425,16 +429,9 @@ export default {
 </script>
 
 <style>
-/* Font */
-@font-face {
-  font-family: 'Material Icons';
-  src: url(https://fonts.gstatic.com/s/materialicons/v139/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2) format('woff2');
-}
-.material-icons {
-  font-family: 'Material Icons';
-  font-size: 24px;
-  line-height: 1;
-}
+/* Font removed to avoid external dependency */
+/* @font-face { ... } removed */
+/* .material-icons { ... } removed */
 
 page {
   background-color: #020b1c;

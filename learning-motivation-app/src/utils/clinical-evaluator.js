@@ -78,8 +78,8 @@ export const evaluateScore = (testType, score, age) => {
     // Score <= Excellent -> >95%
     // Score >= Risk -> <15%
     if (score <= excellent) {
-        // 95-99 range
-        percentile = 95 + Math.random() * 4; 
+        // 95-99 range (Fixed to 98 for deterministic result)
+        percentile = 98; 
     } else if (score >= risk) {
         // 1-15 range
         percentile = Math.max(1, 15 - ((score - risk) / risk * 10));
@@ -94,7 +94,7 @@ export const evaluateScore = (testType, score, age) => {
     // Score >= Excellent -> >95%
     // Score <= Risk -> <15%
     if (score >= excellent) {
-        percentile = 95 + Math.random() * 4;
+        percentile = 98;
     } else if (score <= risk) {
         percentile = Math.max(1, 15 - ((risk - score) / risk * 10));
     } else {

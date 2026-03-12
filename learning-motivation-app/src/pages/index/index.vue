@@ -15,7 +15,7 @@
         </view>
       </view>
 
-      <view class="cards-container">suo
+      <view class="cards-container">
         <view 
           v-for="(item, index) in modules" 
           :key="index"
@@ -58,13 +58,7 @@
       <!-- Spacer for TabBar -->
       <view style="height: 120rpx;"></view>
       
-      <!-- Debug Info -->
-      <view style="padding: 20rpx; text-align: center;">
-        <text style="color: #64748b; font-size: 24rpx; display: block; margin-bottom: 10rpx;">
-          SYSTEM STATUS: {{ isCalibrated ? 'CALIBRATED' : 'UNCALIBRATED' }}
-        </text>
-        <button size="mini" type="warn" @click="clearCalibration">RESET CALIBRATION</button>
-      </view>
+      
     </scroll-view>
 
     <!-- Custom Tab Bar -->
