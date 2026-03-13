@@ -27,7 +27,7 @@
           <image class="stat-icon" :src="icons.check_circle" mode="aspectFit"></image>
           <text class="stat-label">进度</text>
         </view>
-        <text class="stat-value">{{ currentTrial }} / {{ maxTrials }}</text>
+        <text class="stat-value">{{ currentTrial }} / {{ displayTotalTrials }}</text>
       </view>
     </view>
 
@@ -61,12 +61,21 @@
             v-for="(item, index) in 9" 
             :key="index"
             class="grid-cell"
-            :class="{ 'active-cell': currentActiveIndex === index }"
+            :class="{
+              'active-cell': displayActiveIndex === index
+            }"
           >
-            <view v-if="currentActiveIndex === index" class="active-inner">
-              <view class="pulse-ring"></view>
-              <view class="center-dot"></view>
+            <view v-if="displayActiveIndex === index" class="active-inner">
+              <view class="current-ring"></view>
             </view>
+            <view
+              v-if="practiceHintEnabled && previousTrailIndex === index && displayActiveIndex !== index"
+              class="last-marker"
+            ></view>
+            <view
+              v-if="practiceHintEnabled && previousTwoTrailIndex === index"
+              class="second-last-marker"
+            ></view>
           </view>
         </view>
       </view>
@@ -81,30 +90,50 @@
     <view class="controls-footer">
       <button 
         class="match-btn"
-        :class="{ 'btn-disabled': isObservationMode, 'btn-success': feedback === 'correct', 'btn-error': feedback === 'wrong' }"
+        :class="{
+          'btn-disabled': isObservationMode || !isGameActive,
+          'btn-success': feedback === 'correct',
+          'btn-error': feedback === 'wrong',
+          'btn-hint-match': showPracticeMatchHint
+        }"
         @click="handleMatch"
-        :disabled="isObservationMode"
+        :disabled="isObservationMode || !isGameActive"
         hover-class="btn-hover"
       >
         <view class="btn-glow"></view>
         <view class="btn-content">
           <image class="btn-icon" :src="icons.fingerprint" mode="aspectFit"></image>
-          <text class="btn-text">匹配 (MATCH)</text>
+          <text class="btn-text">{{ matchButtonText }}</text>
         </view>
       </button>
       
+    </view>
+
+    <view v-if="showPracticeTransition" class="transition-overlay">
+      <view class="transition-card">
+        <text class="transition-title">练习完成</text>
+        <view class="transition-actions">
+          <view class="transition-btn" :class="{ 'transition-btn-disabled': !canStartFormal }" @click="startFormalTest">
+            <text class="transition-btn-text">进入正式测试</text>
+          </view>
+          <view class="transition-btn transition-btn-secondary" @click="continuePracticeMode">
+            <text class="transition-btn-text transition-btn-text-secondary">继续练习模式</text>
+          </view>
+        </view>
+      </view>
     </view>
     
     <!-- Countdown Overlay -->
     <CountdownOverlay 
       v-if="showCountdown" 
+      :seconds="3"
       @complete="handleCountdownComplete" 
     />
   </view>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { getNormsByAge } from '@/utils/testConfigManager.js';
 import CountdownOverlay from '@/components/CountdownOverlay.vue';
@@ -126,8 +155,13 @@ const N = ref(2); // N-Back level
 const intervalMs = ref(2000);
 const displayMs = ref(500);
 const maxTrials = ref(25);
+const practiceMaxTrials = ref(20);
+const isPracticeMode = ref(true);
+const showPracticeTransition = ref(false);
+const canStartFormal = ref(false);
 
 const currentActiveIndex = ref(-1);
+const practiceHoldIndex = ref(-1);
 const history = ref([]); // Queue of indices
 const currentTrial = ref(0);
 const score = ref(0); // Hits
@@ -142,20 +176,58 @@ const showCountdown = ref(true);
 
 let sequenceTimer = null;
 let currentRoundMatchPressed = false;
+let transitionUnlockTimer = null;
+let hideActiveTimer = null;
 
 // --- Computed ---
 const isObservationMode = computed(() => history.value.length <= N.value);
+const displayActiveIndex = computed(() => {
+  if (isPracticeMode.value) return practiceHoldIndex.value;
+  return currentActiveIndex.value;
+});
+const displayTotalTrials = computed(() => (isPracticeMode.value ? practiceMaxTrials.value : maxTrials.value));
+const practiceHintEnabled = computed(() => isPracticeMode.value && currentTrial.value <= 10);
+const targetCrosshairIndex = computed(() => {
+  if (!isPracticeMode.value) return -1;
+  if (history.value.length <= N.value) return -1;
+  return history.value[history.value.length - 1 - N.value];
+});
+const showPracticeMatchHint = computed(() => {
+  return practiceHintEnabled.value && displayActiveIndex.value >= 0 && targetCrosshairIndex.value >= 0 && displayActiveIndex.value === targetCrosshairIndex.value;
+});
+const matchButtonText = computed(() => {
+  if (!isPracticeMode.value) return '匹配 (MATCH)';
+  if (!practiceHintEnabled.value) return '匹配 (MATCH)';
+  if (isObservationMode.value) return '观察中';
+  if (showPracticeMatchHint.value) return '重合了，点击匹配';
+  return '匹配 (MATCH)';
+});
+const previousTrailIndex = computed(() => {
+  if (history.value.length < 2) return -1;
+  return history.value[history.value.length - 2];
+});
+const previousTwoTrailIndex = computed(() => {
+  if (history.value.length < 3) return -1;
+  return history.value[history.value.length - 3];
+});
 
 const modeText = computed(() => {
+  if (isPracticeMode.value) {
+    return isObservationMode.value ? '练习观察模式' : '练习判断模式';
+  }
   return isObservationMode.value ? '观察模式 (Observation)' : '判断模式 (Judgment)';
 });
 
 const modeClass = computed(() => {
+  if (isPracticeMode.value) {
+    return isObservationMode.value ? 'mode-observation' : 'mode-practice-judgment';
+  }
   return isObservationMode.value ? 'mode-observation' : 'mode-judgment';
 });
 
 const progressPercent = computed(() => {
-  return Math.min(100, (currentTrial.value / maxTrials.value) * 100);
+  const total = displayTotalTrials.value > 0 ? displayTotalTrials.value : 1;
+  return Math.min(100, (currentTrial.value / total) * 100);
 });
 
 // --- Lifecycle ---
@@ -214,14 +286,14 @@ onLoad((options) => {
 
   // 3. Final Check
   if (!activeModuleId.value) {
-    console.error('N-Back: Critical Error - No moduleId found');
-    uni.showModal({
-      title: '参数丢失',
-      content: '测试模块ID丢失，无法保存进度。请返回重新进入。',
-      showCancel: false,
-      success: () => uni.navigateBack()
+    console.warn('N-Back: No moduleId found, entering standalone mode');
+    uni.showToast({
+      title: '独立模式运行',
+      icon: 'none',
+      duration: 1500
     });
-    return;
+  } else {
+    console.log(`[N-Back] Initialized with moduleId: ${activeModuleId.value}, step: ${step.value}`);
   }
 
   const userProfile = uni.getStorageSync('user_profile') || {};
@@ -236,23 +308,21 @@ onLoad((options) => {
   }
 });
 
-onMounted(() => {
-  // startGame(); // Wait for countdown
-});
-
 onUnmounted(() => {
   clearTimeout(sequenceTimer);
+  clearTimeout(transitionUnlockTimer);
+  clearTimeout(hideActiveTimer);
 });
 
 // --- Game Logic ---
 const handleCountdownComplete = () => {
   showCountdown.value = false;
-  startGame();
+  console.log('N-Back: 3秒倒计时结束，启动练习模式');
+  startPracticeMode();
 };
 
-const startGame = () => {
-  console.log('N-Back: Game Started');
-  isGameActive.value = true;
+const resetSessionState = () => {
+  clearTimeout(hideActiveTimer);
   currentTrial.value = 0;
   score.value = 0;
   falseAlarms.value = 0;
@@ -260,16 +330,73 @@ const startGame = () => {
   correctRejections.value = 0;
   history.value = [];
   currentActiveIndex.value = -1;
-  
-  // Start sequence
+  practiceHoldIndex.value = -1;
+  feedback.value = null;
+  feedbackText.value = '';
+  currentRoundMatchPressed = false;
+};
+
+const startPracticeMode = () => {
+  console.log('N-Back: 进入练习模式');
+  isPracticeMode.value = true;
+  showPracticeTransition.value = false;
+  canStartFormal.value = false;
+  clearTimeout(sequenceTimer);
+  clearTimeout(hideActiveTimer);
+  resetSessionState();
+  isGameActive.value = true;
   nextStep();
+};
+
+const finishPractice = () => {
+  console.log('N-Back: 练习结束，展示进入正式测试面板');
+  clearTimeout(sequenceTimer);
+  clearTimeout(hideActiveTimer);
+  isGameActive.value = false;
+  currentActiveIndex.value = -1;
+  practiceHoldIndex.value = -1;
+  feedback.value = null;
+  feedbackText.value = '';
+  showPracticeTransition.value = true;
+  canStartFormal.value = false;
+  clearTimeout(transitionUnlockTimer);
+  transitionUnlockTimer = setTimeout(() => {
+    canStartFormal.value = true;
+    console.log('N-Back: 正式测试按钮已解锁');
+  }, 450);
+};
+
+const startFormalTest = () => {
+  if (!canStartFormal.value) {
+    console.log('N-Back: 忽略过渡按钮误触，等待按钮解锁');
+    return;
+  }
+  console.log('N-Back: 进入正式测试');
+  showPracticeTransition.value = false;
+  isPracticeMode.value = false;
+  clearTimeout(sequenceTimer);
+  clearTimeout(hideActiveTimer);
+  resetSessionState();
+  isGameActive.value = true;
+  nextStep();
+};
+
+const continuePracticeMode = () => {
+  console.log('N-Back: 继续练习模式');
+  showPracticeTransition.value = false;
+  clearTimeout(transitionUnlockTimer);
+  canStartFormal.value = false;
+  showCountdown.value = true;
+  console.log('N-Back: 显示3秒倒计时蒙版，准备继续练习');
 };
 
 const endGame = () => {
   console.log('N-Back: Game Ended');
   clearTimeout(sequenceTimer);
+  clearTimeout(hideActiveTimer);
   isGameActive.value = false;
   currentActiveIndex.value = -1;
+  practiceHoldIndex.value = -1;
   
   try {
     uni.showLoading({ title: '保存中...', mask: true });
@@ -375,8 +502,13 @@ const nextStep = () => {
   }
 
   // Check for end of game
-  if (currentTrial.value >= maxTrials.value) {
-    endGame();
+  const totalTrials = isPracticeMode.value ? practiceMaxTrials.value : maxTrials.value;
+  if (currentTrial.value >= totalTrials) {
+    if (isPracticeMode.value) {
+      finishPractice();
+    } else {
+      endGame();
+    }
     return;
   }
 
@@ -393,7 +525,18 @@ const nextStep = () => {
   // Only applicable if we have enough history to form a match (historyLen >= N)
   const canFormMatch = historyLen >= N.value;
   
-  if (canFormMatch && Math.random() < 0.3) {
+  if (isPracticeMode.value && historyLen < 4) {
+    const usedIndexSet = new Set(history.value);
+    const availableIndexList = [];
+    for (let i = 0; i < 9; i++) {
+      if (!usedIndexSet.has(i)) {
+        availableIndexList.push(i);
+      }
+    }
+    const randomCandidateIndex = Math.floor(Math.random() * availableIndexList.length);
+    nextIndex = availableIndexList[randomCandidateIndex];
+    console.log(`[N-Back] 练习模式前5次防重叠出题，轮次=${historyLen + 1}，可选=${availableIndexList.join(',')}，命中=${nextIndex}`);
+  } else if (canFormMatch && Math.random() < 0.3) {
     nextIndex = history.value[historyLen - N.value];
   } else {
     // Random other index
@@ -405,14 +548,26 @@ const nextStep = () => {
   // Update history
   history.value.push(nextIndex);
   currentTrial.value++;
+  if (isPracticeMode.value && currentTrial.value === 11) {
+    console.log('[N-Back] 练习模式已到第11题，关闭提示显示');
+  }
   
   // Flash square
   currentActiveIndex.value = nextIndex;
+  if (isPracticeMode.value) {
+    practiceHoldIndex.value = nextIndex;
+  }
   
-  // Schedule hide
-  setTimeout(() => {
-    currentActiveIndex.value = -1;
-  }, displayMs.value);
+  if (isPracticeMode.value) {
+    console.log(`[N-Back] 练习模式保持高亮，位置=${nextIndex}，等待下一次跳转`);
+  } else {
+    practiceHoldIndex.value = -1;
+    clearTimeout(hideActiveTimer);
+    hideActiveTimer = setTimeout(() => {
+      currentActiveIndex.value = -1;
+      console.log(`[N-Back] 正式模式隐藏高亮，位置=${nextIndex}`);
+    }, displayMs.value);
+  }
   
   // Schedule next step (Display Time + Interval Time)
   // Wait: The requirement says "图片消失后的黑屏间隔时间：改为 config.intervalMs".
@@ -678,6 +833,12 @@ const goBack = () => {
   color: #f97316;
 }
 
+.mode-practice-judgment {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.35);
+  color: #4ade80;
+}
+
 .ping-dot {
   position: relative;
   width: 8px;
@@ -769,6 +930,8 @@ const goBack = () => {
 }
 
 .active-inner {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   display: flex;
@@ -776,20 +939,37 @@ const goBack = () => {
   justify-content: center;
 }
 
-.pulse-ring {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background: rgba(13, 166, 242, 0.1);
-  animation: pulse 2s infinite;
+.current-ring {
+  width: 26px;
+  height: 26px;
+  border: 2px solid #0da6f2;
+  border-radius: 50%;
+  box-shadow: 0 0 16px rgba(13, 166, 242, 0.55);
 }
 
-.center-dot {
-  width: 8px;
-  height: 8px;
-  background: #0da6f2;
+.last-marker {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%, -50%);
   border-radius: 50%;
-  box-shadow: 0 0 10px #0da6f2;
+  border: 2px solid rgba(13, 166, 242, 0.8);
+  background: transparent;
+}
+
+.second-last-marker {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(13, 166, 242, 0.75);
 }
 
 @keyframes pulse {
@@ -859,6 +1039,14 @@ const goBack = () => {
   background: linear-gradient(to bottom, rgba(239, 68, 68, 0.8), #ef4444);
 }
 
+.btn-hint-match .btn-content {
+  background: linear-gradient(to bottom, rgba(74, 222, 128, 0.85), #22c55e);
+}
+
+.btn-hint-wait .btn-content {
+  background: linear-gradient(to bottom, rgba(251, 191, 36, 0.85), #f59e0b);
+}
+
 .btn-hover {
   transform: scale(0.98);
 }
@@ -881,6 +1069,80 @@ const goBack = () => {
 
 .correct { color: #4ade80; }
 .wrong { color: #ef4444; }
+
+.transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(2, 11, 28, 0.55);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.transition-card {
+  width: 100%;
+  max-width: 680rpx;
+  border-radius: 24rpx;
+  padding: 48rpx 40rpx;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 11, 28, 0.95));
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 40rpx rgba(34, 211, 238, 0.2), inset 0 0 50rpx rgba(34, 211, 238, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.transition-title {
+  font-size: 44rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: #e0f2fe;
+  text-align: center;
+}
+
+.transition-actions {
+  margin-top: 8rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.transition-btn {
+  width: 420rpx;
+  max-width: 100%;
+  align-self: center;
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.92), rgba(56, 189, 248, 0.92));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transition-btn-text {
+  color: #06233a;
+  font-size: 30rpx;
+  font-weight: 800;
+  letter-spacing: 1rpx;
+}
+
+.transition-btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(34, 211, 238, 0.72);
+}
+
+.transition-btn-text-secondary {
+  color: #e0f2fe;
+}
+
+.transition-btn-disabled {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
 
 @keyframes floatUp {
   0% { transform: translateY(0) scale(0.5); opacity: 0; }

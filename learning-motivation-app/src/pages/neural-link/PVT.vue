@@ -31,7 +31,7 @@
         
         <!-- Progress Indicator -->
         <view class="round-indicator">
-          <text class="round-text">ROUND {{ currentRound + 1 }} / {{ maxRounds }}</text>
+          <text class="round-text">{{ modeLabel }} ROUND {{ displayRound }} / {{ displayTotalRounds }}</text>
         </view>
 
         <!-- READY State (Default) -->
@@ -44,9 +44,9 @@
           <view class="dots-indicator">
             <view 
               class="dot" 
-              v-for="n in maxRounds" 
+              v-for="n in displayTotalRounds" 
               :key="n" 
-              :class="{ active: n === currentRound + 1 }"
+              :class="{ active: n === displayRound }"
             ></view>
           </view>
         </template>
@@ -100,14 +100,38 @@
       </view>
     </view>
 
+    <view v-if="showPracticeTransition" class="transition-overlay">
+      <view class="transition-card">
+        <text class="transition-title">练习完成</text>
+        <view class="transition-actions">
+          <view
+            class="transition-btn"
+            :class="{ 'transition-btn-disabled': !canStartFormal }"
+            @touchstart.stop.prevent="startFormalTest"
+            @click.stop.prevent="startFormalTest"
+          >
+            <text class="transition-btn-text">进入正式测试</text>
+          </view>
+          <view
+            class="transition-btn transition-btn-secondary"
+            @touchstart.stop.prevent="continuePractice"
+            @click.stop.prevent="continuePractice"
+          >
+            <text class="transition-btn-text transition-btn-text-secondary">继续练习模式</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <CountdownOverlay
+      v-if="showCountdown"
+      :seconds="3"
+      @complete="handlePracticeCountdownComplete"
+    />
+
     <!-- Decorative Elements -->
     <view class="grid-overlay"></view>
     <view class="scan-line"></view>
-    <CountdownOverlay 
-      v-if="showCountdown" 
-      offset-y="-200rpx"
-      @complete="handleCountdownComplete" 
-    />
   </view>
 </template>
 
@@ -125,8 +149,8 @@
 </script>
 
 <script>
-import CountdownOverlay from '@/components/CountdownOverlay.vue';
 import { getNormsByAge } from '@/utils/testConfigManager.js';
+import CountdownOverlay from '@/components/CountdownOverlay.vue';
 
 export default {
   components: {
@@ -142,14 +166,20 @@ export default {
       startTime: 0,
       endTime: 0,
       timer: null,
-      
-      showCountdown: true,
+      entryDelayTimer: null,
+      roundTransitionTimer: null,
+      transitionUnlockTimer: null,
       
       // Test Data
       reactionTimes: [],
       falseStartCount: 0,
-      currentRound: 0,
+      currentRound: 1,
       maxRounds: 5,
+      practiceMaxRounds: 3,
+      isPracticeMode: true,
+      showPracticeTransition: false,
+      canStartFormal: false,
+      showCountdown: true,
       config: null, // Dynamic configuration
       moduleId: '01', // Default
       step: 1,
@@ -185,6 +215,18 @@ export default {
       if (this.latency > 25) return 'red-text';
       if (this.latency > 18) return 'yellow-text';
       return 'cyan-text';
+    },
+    displayTotalRounds() {
+      return this.isPracticeMode ? this.practiceMaxRounds : this.maxRounds;
+    },
+    displayRound() {
+      const total = this.displayTotalRounds > 0 ? this.displayTotalRounds : 1;
+      if (this.currentRound < 1) return 1;
+      if (this.currentRound > total) return total;
+      return this.currentRound;
+    },
+    modeLabel() {
+      return this.isPracticeMode ? '练习' : '正式';
     }
   },
   onLoad(options) {
@@ -280,19 +322,30 @@ export default {
     // #endif
 
     this.startHardwareMonitor();
-    // this.initTest();
+    console.log('[NeuralTest] 页面已进入，显示3秒倒计时蒙版');
+    this.startPracticeCountdown('页面进入');
   },
   onUnload() {
     this.stopHardwareMonitor();
-    if (this.timer) clearTimeout(this.timer);
+    this.clearGameTimers();
+    if (this.entryDelayTimer) clearTimeout(this.entryDelayTimer);
   },
   methods: {
-    handleCountdownComplete() {
+    startPracticeCountdown(source) {
+      console.log(`[NeuralTest] 触发练习倒计时，来源=${source}`);
+      this.clearGameTimers();
+      this.showPracticeTransition = false;
+      this.state = 'WAIT';
+      this.showCountdown = true;
+    },
+    handlePracticeCountdownComplete() {
+      console.log('[NeuralTest] 3秒倒计时结束，启动练习模式');
       this.showCountdown = false;
       this.initTest();
     },
     goBack(e) {
       console.log('[NeuralTest] User clicked Back', e);
+      this.clearGameTimers();
       uni.navigateBack();
     },
     
@@ -355,10 +408,29 @@ export default {
     },
 
     // --- Game Logic ---
+    clearGameTimers() {
+      if (this.timer) {
+        clearTimeout(this.timer);
+        this.timer = null;
+      }
+      if (this.roundTransitionTimer) {
+        clearTimeout(this.roundTransitionTimer);
+        this.roundTransitionTimer = null;
+      }
+      if (this.transitionUnlockTimer) {
+        clearTimeout(this.transitionUnlockTimer);
+        this.transitionUnlockTimer = null;
+      }
+    },
     initTest() {
+      console.log('[NeuralTest] 启动练习模式');
+      this.clearGameTimers();
+      this.isPracticeMode = true;
+      this.showPracticeTransition = false;
       this.reactionTimes = [];
       this.falseStartCount = 0;
-      this.currentRound = 0;
+      this.currentRound = 1;
+      this.state = 'WAIT';
       this.startCalibration();
     },
 
@@ -374,6 +446,7 @@ export default {
       const max = this.config ? this.config.delayMaxMs : 4000;
       const delay = Math.floor(Math.random() * (max - min)) + min;
       
+      if (this.timer) clearTimeout(this.timer);
       this.timer = setTimeout(() => {
         if (this.state === 'READY') {
           this.triggerSignal();
@@ -409,7 +482,11 @@ export default {
     },
     
     handleAction(timestamp) {
-      console.log(`[NeuralTest] Action Triggered. State: ${this.state}, Timestamp: ${timestamp || 'now'}`);
+      console.log(`[NeuralTest] Action Triggered. Mode: ${this.modeLabel}, Round: ${this.currentRound}, State: ${this.state}, Timestamp: ${timestamp || 'now'}`);
+      if (this.showCountdown) {
+        console.log('[NeuralTest] 倒计时蒙版显示中，忽略点击');
+        return;
+      }
       
       if (this.state === 'WAIT' || this.state === 'FINISHED') {
         // Ignore
@@ -436,27 +513,64 @@ export default {
         this.state = 'FINISHED'; // Prevent double-trigger (touchstart + click)
         this.endTime = actionTime;
         const reactionTime = this.endTime - this.startTime;
-        console.log(`[NeuralTest] Round ${this.currentRound + 1} Valid Reaction! Time: ${reactionTime}ms`);
+        console.log(`[NeuralTest] Round ${this.currentRound} Valid Reaction! Time: ${reactionTime}ms`);
         
         this.reactionTimes.push(reactionTime);
         
-        if (this.currentRound < this.maxRounds - 1) {
-          // Prepare next round
+        if (this.currentRound < this.displayTotalRounds) {
           this.currentRound++;
-          setTimeout(() => {
+          if (this.roundTransitionTimer) clearTimeout(this.roundTransitionTimer);
+          this.roundTransitionTimer = setTimeout(() => {
             this.startCalibration();
           }, 1000);
         } else {
-          // Finish
-          this.completeTest();
+          if (this.isPracticeMode) {
+            this.finishPractice();
+          } else {
+            this.completeTest();
+          }
         }
       }
     },
     
     resetTest() {
-      console.log('[NeuralTest] User clicked Retry');
-      // Retry the current round
+      console.log(`[NeuralTest] User clicked Retry, Mode: ${this.modeLabel}, Round: ${this.currentRound}`);
+      this.state = 'WAIT';
       this.startCalibration();
+    },
+    finishPractice() {
+      console.log('[NeuralTest] 练习阶段结束，等待进入正式测试');
+      this.clearGameTimers();
+      this.state = 'WAIT';
+      this.showPracticeTransition = true;
+      this.canStartFormal = false;
+      this.currentRound = 1;
+      this.transitionUnlockTimer = setTimeout(() => {
+        this.canStartFormal = true;
+        console.log('[NeuralTest] 正式测试按钮已解锁');
+      }, 450);
+    },
+    startFormalTest() {
+      if (!this.canStartFormal) {
+        console.log('[NeuralTest] 忽略过渡按钮误触，等待按钮解锁');
+        return;
+      }
+      console.log('[NeuralTest] 进入正式测试，开始正式回合');
+      this.clearGameTimers();
+      this.isPracticeMode = false;
+      this.showPracticeTransition = false;
+      this.canStartFormal = false;
+      this.reactionTimes = [];
+      this.falseStartCount = 0;
+      this.currentRound = 1;
+      this.state = 'WAIT';
+      this.startCalibration();
+    },
+    continuePractice() {
+      console.log('[NeuralTest] 继续练习模式');
+      this.clearGameTimers();
+      this.canStartFormal = false;
+      this.startPracticeCountdown('继续练习');
     },
     
     completeTest() {
@@ -984,5 +1098,78 @@ page {
   background: rgba(255, 77, 79, 0.1);
   position: relative;
   z-index: 20;
+}
+
+.transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(2, 11, 28, 0.55);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.transition-card {
+  width: 100%;
+  max-width: 680rpx;
+  border-radius: 24rpx;
+  padding: 48rpx 40rpx;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 11, 28, 0.95));
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 40rpx rgba(34, 211, 238, 0.2), inset 0 0 50rpx rgba(34, 211, 238, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.transition-title {
+  font-size: 44rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: #e0f2fe;
+  text-align: center;
+}
+
+.transition-actions {
+  margin-top: 8rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.transition-btn {
+  width: 420rpx;
+  max-width: 100%;
+  align-self: center;
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.92), rgba(56, 189, 248, 0.92));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transition-btn-disabled {
+  opacity: 0.55;
+}
+
+.transition-btn-text {
+  color: #06233a;
+  font-size: 30rpx;
+  font-weight: 800;
+  letter-spacing: 1rpx;
+}
+
+.transition-btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(34, 211, 238, 0.72);
+}
+
+.transition-btn-text-secondary {
+  color: #e0f2fe;
 }
 </style>

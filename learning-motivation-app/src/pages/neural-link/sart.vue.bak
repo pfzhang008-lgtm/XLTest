@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <view class="container" :class="{ 'page-shake': isPageShaking }">
     <!-- Background Elements -->
     <view class="radar-grid"></view>
@@ -80,8 +80,8 @@
           <view class="scan-beam"></view>
         </view>
         <view class="btn-text-group">
-          <text class="btn-main-text" :class="practiceActionHintClass">{{ practiceActionHint }}</text>
-          <text class="btn-sub-text">{{ practiceActionSubHint }}</text>
+          <text class="btn-main-text">启动拦截扫描</text>
+          <text class="btn-sub-text">等待输入中...</text>
         </view>
         <image class="arrow-icon" :src="icons.chevron_right" mode="aspectFit"></image>
       </view>
@@ -95,28 +95,16 @@
         style="width: 100%; max-width: 680rpx; border-radius: 24rpx; padding: 48rpx 40rpx; background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 11, 28, 0.95)); border: 1px solid rgba(34, 211, 238, 0.55); box-shadow: 0 0 40rpx rgba(34, 211, 238, 0.2), inset 0 0 50rpx rgba(34, 211, 238, 0.08); display: flex; flex-direction: column; gap: 20rpx;"
       >
         <text style="font-size: 44rpx; font-weight: 800; letter-spacing: 2rpx; color: #e0f2fe; text-align: center;">练习完成</text>
-        <view style="margin-top: 20rpx; display: flex; flex-direction: column; gap: 16rpx; align-items: center;">
-          <view
-            @click="startFormalTest"
-            style="width: 420rpx; max-width: 100%; height: 96rpx; border-radius: 14rpx; background: linear-gradient(90deg, rgba(6, 182, 212, 0.35), rgba(14, 116, 144, 0.45)); border: 1px solid rgba(34, 211, 238, 0.9); color: #ecfeff; font-size: 30rpx; font-weight: 700; letter-spacing: 1rpx; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 26rpx rgba(34, 211, 238, 0.4);"
-          >
-            <text>进入正式测试</text>
-          </view>
-          <view
-            @click="continuePracticeMode"
-            style="width: 420rpx; max-width: 100%; height: 96rpx; border-radius: 14rpx; background: transparent; border: 1px solid rgba(34, 211, 238, 0.72); color: #e0f2fe; font-size: 30rpx; font-weight: 700; letter-spacing: 1rpx; display: flex; align-items: center; justify-content: center;"
-          >
-            <text>继续练习模式</text>
-          </view>
+        <text style="font-size: 28rpx; line-height: 1.7; color: rgba(226, 232, 240, 0.9); text-align: center;">刚刚的数据不会被记录。</text>
+        <text style="font-size: 28rpx; line-height: 1.7; color: rgba(226, 232, 240, 0.9); text-align: center;">接下来将进入静默监测，正式阶段不再提示对错或超时。</text>
+        <view
+          @click="startFormalTest"
+          style="margin-top: 20rpx; height: 96rpx; border-radius: 14rpx; background: linear-gradient(90deg, rgba(6, 182, 212, 0.35), rgba(14, 116, 144, 0.45)); border: 1px solid rgba(34, 211, 238, 0.9); color: #ecfeff; font-size: 30rpx; font-weight: 700; letter-spacing: 1rpx; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 26rpx rgba(34, 211, 238, 0.4);"
+        >
+          <text>我准备好了，进入正式测试</text>
         </view>
       </view>
     </view>
-
-    <CountdownOverlay
-      v-if="showCountdown"
-      :seconds="3"
-      @complete="handlePracticeCountdownComplete"
-    />
   </view>
 </template>
 
@@ -124,7 +112,6 @@
 import { ref, computed, onUnmounted } from 'vue';
 import { onLoad } from '@dcloudio/uni-app';
 import { getNormsByAge } from '@/utils/testConfigManager.js';
-import CountdownOverlay from '@/components/CountdownOverlay.vue';
 
 // --- Icons (Data URIs) ---
 const icons = {
@@ -143,7 +130,6 @@ const step = ref(1);
 const isPracticeMode = ref(true);
 const practiceMaxTrials = ref(5);
 const showPracticeTransition = ref(false);
-const showCountdown = ref(false);
 
 const currentTrial = ref(0);
 const isGameActive = ref(false);
@@ -163,21 +149,6 @@ const feedback = ref(null); // 'hit' | 'miss' | 'false-alarm' | null
 const isPressed = ref(false);
 const isPageShaking = ref(false);
 const practiceStimulusQueue = ref([]);
-const practiceActionHint = computed(() => {
-  if (!isPracticeMode.value) return '启动拦截扫描';
-  if (isVisible.value && currentStimulus.value === 3) return '3出现了不要点击';
-  return '不是3可以点击';
-});
-const practiceActionSubHint = computed(() => {
-  if (!isPracticeMode.value) return '等待输入中...';
-  if (isVisible.value && currentStimulus.value === 3) return '抑制冲动，保持不点击';
-  return '看到其他数字立即点击';
-});
-const practiceActionHintClass = computed(() => {
-  if (!isPracticeMode.value) return '';
-  if (isVisible.value && currentStimulus.value === 3) return 'hint-stop';
-  return 'hint-go';
-});
 const practiceFeedbackDisplay = computed(() => {
   if (feedback.value === 'hit') return '正确，继续';
   if (feedback.value === 'miss') return '超时，快一点';
@@ -305,8 +276,12 @@ onLoad((options) => {
     intervalMs.value = config.value.intervalMs || 1500;
     nogoProb.value = config.value.nogoProb;
   }
-  console.log('[SART] 页面已进入，显示3秒倒计时蒙版');
-  startPracticeCountdown('页面进入');
+  console.log('[SART] 页面已进入，2秒后启动练习模式');
+  clearTimeout(entryDelayTimer);
+  entryDelayTimer = setTimeout(() => {
+    console.log('[SART] 2秒缓冲结束，开始练习模式');
+    startGame();
+  }, 2000);
 });
 
 onUnmounted(() => {
@@ -317,20 +292,6 @@ onUnmounted(() => {
 // --- Game Logic ---
 const goBack = () => {
   uni.navigateBack();
-};
-
-const startPracticeCountdown = (source) => {
-  console.log(`[SART] 触发练习倒计时，来源=${source}`);
-  stopAllTimers();
-  isGameActive.value = false;
-  showPracticeTransition.value = false;
-  showCountdown.value = true;
-};
-
-const handlePracticeCountdownComplete = () => {
-  console.log('[SART] 3秒倒计时结束，启动练习模式');
-  showCountdown.value = false;
-  startGame();
 };
 
 const startGame = () => {
@@ -540,11 +501,6 @@ const startFormalTest = () => {
   resetState();
   isGameActive.value = true;
   nextTrial();
-};
-
-const continuePracticeMode = () => {
-  console.log('[SART] 继续练习模式');
-  startPracticeCountdown('继续练习');
 };
 
 const endGame = () => {
@@ -1248,14 +1204,6 @@ const quitTest = () => {
   font-size: 20px;
   font-weight: bold;
   color: #fff;
-}
-
-.btn-main-text.hint-go {
-  color: #22c55e;
-}
-
-.btn-main-text.hint-stop {
-  color: #ef4444;
 }
 
 .btn-sub-text {

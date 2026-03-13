@@ -7,19 +7,26 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 
 const props = defineProps({
   offsetY: {
     type: String,
     default: '0'
+  },
+  seconds: {
+    type: Number,
+    default: 3
   }
 });
 
 const emit = defineEmits(['complete']);
 
-const count = ref(5);
+const initialCount = Number.isFinite(props.seconds) && props.seconds > 0 ? Math.floor(props.seconds) : 3;
+const count = ref(initialCount);
 const animate = ref(false);
+let timer = null;
+let animationTimer = null;
 
 const displayValue = computed(() => {
   return count.value.toString();
@@ -28,22 +35,34 @@ const displayValue = computed(() => {
 onMounted(() => {
   animate.value = true;
   
-  const timer = setInterval(() => {
+  timer = setInterval(() => {
     // Reset animation trigger
     animate.value = false;
     
     // Force reflow for animation restart (next tick)
-    setTimeout(() => {
+    animationTimer = setTimeout(() => {
       count.value--;
       animate.value = true;
       
       if (count.value <= 0) {
         clearInterval(timer);
+        timer = null;
         emit('complete');
       }
     }, 50);
     
   }, 1000);
+});
+
+onUnmounted(() => {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+  if (animationTimer) {
+    clearTimeout(animationTimer);
+    animationTimer = null;
+  }
 });
 </script>
 

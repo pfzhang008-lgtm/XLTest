@@ -21,22 +21,22 @@
     <!-- Progress Bar Section -->
     <view class="progress-section">
       <view class="progress-info">
-        <text class="sequence-text">序列 : <text class="cyan-text">{{ expectedNumber }}</text> / 25</text>
+        <text class="sequence-text">{{ modeLabel }}序列 : <text class="cyan-text">{{ expectedNumber }}</text> / {{ maxNumber }}</text>
         <text class="focus-text">专注度 : <text class="red-text">临界</text></text>
       </view>
       <view class="progress-bar-bg">
-        <view class="progress-bar-fill" :style="{ width: (expectedNumber / 25 * 100) + '%' }"></view>
+        <view class="progress-bar-fill" :style="{ width: progressPercent + '%' }"></view>
       </view>
     </view>
 
     <!-- Instruction -->
     <view class="instruction-container">
-      <text class="instruction-text glitch-text">按顺序点击 1-25</text>
+      <text class="instruction-text glitch-text">{{ instructionText }}</text>
     </view>
 
     <!-- Schulte Grid -->
     <view class="grid-container">
-      <view class="schulte-grid">
+      <view class="schulte-grid" :class="gridClass">
         <view 
           v-for="(item, index) in gridData" 
           :key="index"
@@ -71,11 +71,25 @@
         <view v-for="n in 5" :key="n" class="noise-bar" :style="{ height: getRandomHeight(n) + 'rpx' }"></view>
       </view>
     </view>
-    
-    <!-- Countdown Overlay -->
-    <CountdownOverlay 
-      v-if="showCountdown" 
-      @complete="handleCountdownComplete" 
+
+    <view v-if="showPracticeTransition" class="transition-overlay">
+      <view class="transition-card">
+        <text class="transition-title">练习完成</text>
+        <view class="transition-actions">
+          <view class="transition-btn" @click="startFormalTest">
+            <text class="transition-btn-text">进入正式测试</text>
+          </view>
+          <view class="transition-btn transition-btn-secondary" @click="continuePracticeMode">
+            <text class="transition-btn-text transition-btn-text-secondary">继续练习模式</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <CountdownOverlay
+      v-if="showCountdown"
+      :seconds="3"
+      @complete="handlePracticeCountdownComplete"
     />
   </view>
 </template>
@@ -90,13 +104,18 @@ export default {
   },
   data() {
     return {
-      showCountdown: true,
       gridData: [],
       expectedNumber: 1,
       startTime: 0,
       currentTime: 0,
       timerInterval: null,
       effectInterval: null,
+      entryDelayTimer: null,
+      isPracticeMode: true,
+      showPracticeTransition: false,
+      showCountdown: true,
+      practiceMaxNumber: 9,
+      formalMaxNumber: 25,
       statusBarHeight: 20,
       menuButtonTop: 24,
       menuButtonHeight: 32,
@@ -120,6 +139,25 @@ export default {
       excellentSec: 25,
       riskSec: 45
     };
+  },
+  computed: {
+    maxNumber() {
+      return this.isPracticeMode ? this.practiceMaxNumber : this.formalMaxNumber;
+    },
+    modeLabel() {
+      return this.isPracticeMode ? '练习' : '正式';
+    },
+    progressPercent() {
+      const total = this.maxNumber > 0 ? this.maxNumber : 1;
+      const current = this.expectedNumber > total ? total : this.expectedNumber;
+      return (current / total) * 100;
+    },
+    instructionText() {
+      return this.isPracticeMode ? '按顺序点击 1-9' : '按顺序点击 1-25';
+    },
+    gridClass() {
+      return this.isPracticeMode ? 'schulte-grid-practice' : 'schulte-grid-formal';
+    }
   },
   onLoad(options) {
     if (options && options.mode) {
@@ -181,21 +219,32 @@ export default {
     this.navPaddingBottom = 4;
     // #endif
 
-    this.initGrid();
-    // this.startTimer();
-    // this.startRandomEffects();
+    console.log('Schulte Grid: 页面已进入，显示3秒倒计时蒙版');
+    this.startPracticeCountdown('页面进入');
   },
   onUnload() {
+    if (this.entryDelayTimer) clearTimeout(this.entryDelayTimer);
     this.clearTimers();
   },
   methods: {
-    handleCountdownComplete() {
-      this.showCountdown = false;
-      this.startTimer();
-      this.startRandomEffects();
-    },
     goBack() {
+      console.log('Schulte Grid: 点击返回');
       uni.navigateBack();
+    },
+    startPracticeCountdown(source) {
+      console.log(`Schulte Grid: 触发练习倒计时，来源=${source}`);
+      if (this.entryDelayTimer) {
+        clearTimeout(this.entryDelayTimer);
+        this.entryDelayTimer = null;
+      }
+      this.clearTimers();
+      this.showPracticeTransition = false;
+      this.showCountdown = true;
+    },
+    handlePracticeCountdownComplete() {
+      console.log('Schulte Grid: 3秒倒计时结束，启动练习模式');
+      this.showCountdown = false;
+      this.startPracticeMode();
     },
     formatTime(val) {
       return val < 10 ? `0${val}` : val;
@@ -207,9 +256,49 @@ export default {
       // Simulate noise bars
       return 20 + Math.random() * 40;
     },
+    startPracticeMode() {
+      console.log('Schulte Grid: 进入练习模式');
+      this.isPracticeMode = true;
+      this.showPracticeTransition = false;
+      this.resetSessionState();
+      this.initGrid();
+      this.startTimer();
+      this.startRandomEffects();
+    },
+    finishPractice() {
+      console.log('Schulte Grid: 练习结束，显示正式测试入口');
+      this.clearTimers();
+      this.showPracticeTransition = true;
+      this.expectedNumber = 1;
+    },
+    startFormalTest() {
+      console.log('Schulte Grid: 点击进入正式测试');
+      this.isPracticeMode = false;
+      this.showPracticeTransition = false;
+      this.resetSessionState();
+      this.initGrid();
+      this.startTimer();
+      this.startRandomEffects();
+    },
+    continuePracticeMode() {
+      console.log('Schulte Grid: 继续练习模式');
+      this.startPracticeCountdown('继续练习');
+    },
+    resetSessionState() {
+      console.log(`Schulte Grid: 重置会话状态，模式=${this.isPracticeMode ? '练习' : '正式'}`);
+      this.clearTimers();
+      this.errorCount = 0;
+      this.focusSegments = [];
+      this.currentFocusBlock = 0;
+      this.expectedNumber = 1;
+      this.minutes = 0;
+      this.seconds = 0;
+      this.milliseconds = 0;
+      this.lastClickTimestamp = Date.now();
+    },
     initGrid() {
-      console.log('Schulte Grid: Initializing grid with 25 numbers');
-      let numbers = Array.from({ length: 25 }, (_, i) => i + 1);
+      console.log(`Schulte Grid: 初始化网格，模式=${this.isPracticeMode ? '练习' : '正式'}，范围=1-${this.maxNumber}`);
+      let numbers = Array.from({ length: this.maxNumber }, (_, i) => i + 1);
       // Fisher-Yates Shuffle
       for (let i = numbers.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -234,7 +323,7 @@ export default {
       console.log('Schulte Grid: Grid initialized, waiting for input');
     },
     startTimer() {
-      console.log('Schulte Grid: Timer starting...');
+      console.log(`Schulte Grid: 计时开始，模式=${this.isPracticeMode ? '练习' : '正式'}`);
       this.startTime = Date.now();
       this.timerInterval = setInterval(() => {
         const diff = Date.now() - this.startTime;
@@ -244,6 +333,7 @@ export default {
       }, 30); // ~30fps update
     },
     startRandomEffects() {
+      console.log(`Schulte Grid: 干扰效果启动，模式=${this.isPracticeMode ? '练习' : '正式'}`);
       // Random interference every 2-4 seconds
       const loop = () => {
         const delay = 2000 + Math.random() * 2000;
@@ -292,13 +382,21 @@ export default {
       // }
     },
     getRandomCell() {
-      const idx = Math.floor(Math.random() * 25);
+      const idx = Math.floor(Math.random() * this.gridData.length);
       return this.gridData[idx];
     },
     handleCellClick(index) {
+      if (this.showPracticeTransition) {
+        console.log('Schulte Grid: 过渡层显示中，忽略网格点击');
+        return;
+      }
+      if (this.showCountdown) {
+        console.log('Schulte Grid: 倒计时蒙版显示中，忽略网格点击');
+        return;
+      }
       const cell = this.gridData[index];
       const now = Date.now();
-      console.log(`Schulte Grid: Cell clicked - Value: ${cell.value}, Expected: ${this.expectedNumber}`);
+      console.log(`Schulte Grid: 点击网格，模式=${this.isPracticeMode ? '练习' : '正式'}，点击值=${cell.value}，目标值=${this.expectedNumber}`);
       
       if (cell.value === this.expectedNumber) {
         // Correct click
@@ -324,14 +422,18 @@ export default {
         }, 300); // Increased duration for better visibility
 
         this.expectedNumber++;
-        if (this.expectedNumber > 25) {
+        if (this.expectedNumber > this.maxNumber) {
           // Save the last focus block if any
           if (this.currentFocusBlock > 0) {
             this.focusSegments.push(this.currentFocusBlock);
           }
           
           setTimeout(() => {
-            this.finishTest();
+            if (this.isPracticeMode) {
+              this.finishPractice();
+            } else {
+              this.finishTest();
+            }
           }, 300);
         }
       } else {
@@ -345,7 +447,7 @@ export default {
           cell.isWrong = false;
         }, 400);
         
-        uni.showToast({ title: '专注!', icon: 'none', duration: 500 });
+        uni.showToast({ title: `${this.expectedNumber}`, icon: 'none', duration: 500 });
       }
       
       // Clear interference on click
@@ -356,7 +458,7 @@ export default {
       }
     },
     finishTest() {
-      console.log('Schulte Grid: Test finished, navigating to results');
+      console.log('Schulte Grid: 正式测试完成，准备保存并返回');
       this.clearTimers();
       
       try {
@@ -423,8 +525,14 @@ export default {
           }, 1500);
     },
     clearTimers() {
-      if (this.timerInterval) clearInterval(this.timerInterval);
-      if (this.effectInterval) clearTimeout(this.effectInterval);
+      if (this.timerInterval) {
+        clearInterval(this.timerInterval);
+        this.timerInterval = null;
+      }
+      if (this.effectInterval) {
+        clearTimeout(this.effectInterval);
+        this.effectInterval = null;
+      }
     }
   }
 };
@@ -592,12 +700,21 @@ page {
 
 .schulte-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  grid-template-rows: repeat(5, 1fr);
   gap: 16rpx;
   width: 100%;
   max-width: 686rpx;
   aspect-ratio: 1;
+}
+
+.schulte-grid-formal {
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+}
+
+.schulte-grid-practice {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  max-width: 540rpx;
 }
 
 .grid-cell {
@@ -754,5 +871,74 @@ page {
 .warning-text {
   color: #9ca3af;
   font-size: 22rpx;
+}
+
+.transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(2, 11, 28, 0.55);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.transition-card {
+  width: 100%;
+  max-width: 680rpx;
+  border-radius: 24rpx;
+  padding: 48rpx 40rpx;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 11, 28, 0.95));
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 40rpx rgba(34, 211, 238, 0.2), inset 0 0 50rpx rgba(34, 211, 238, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.transition-title {
+  font-size: 44rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: #e0f2fe;
+  text-align: center;
+}
+
+.transition-actions {
+  margin-top: 8rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.transition-btn {
+  width: 420rpx;
+  max-width: 100%;
+  align-self: center;
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.92), rgba(56, 189, 248, 0.92));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.transition-btn-text {
+  color: #06233a;
+  font-size: 30rpx;
+  font-weight: 800;
+  letter-spacing: 1rpx;
+}
+
+.transition-btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(34, 211, 238, 0.72);
+}
+
+.transition-btn-text-secondary {
+  color: #e0f2fe;
 }
 </style>

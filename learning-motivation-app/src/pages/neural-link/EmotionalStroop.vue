@@ -18,10 +18,10 @@
         <view class="timer-pill">
           <!-- Replaced material icon with simple text/unicode to avoid external font dependency -->
           <text class="timer-icon">≡</text>
-          <text class="timer-text">{{ currentRound }} / {{ maxRounds }}</text>
+          <text class="timer-text">{{ modeLabel }} {{ currentRound }} / {{ displayTotalRounds }}</text>
         </view>
         <view class="system-status">
-          <text class="status-text">EMOTIONAL_PROTOCOL</text>
+          <text class="status-text">{{ protocolLabel }}</text>
         </view>
       </view>
 
@@ -42,12 +42,18 @@
 
     <!-- Main Stimulus -->
     <view class="stimulus-area">
-      <!-- Crosshair for Cooling Phase -->
       <view class="crosshair-container" v-if="showCrosshair">
         <text class="crosshair">+</text>
       </view>
 
-      <!-- Stimulus Word -->
+      <view
+        v-if="isPracticeMode && practiceFeedback"
+        class="feedback-indicator"
+        :class="practiceFeedback"
+      >
+        <text class="feedback-icon">{{ practiceFeedback === 'correct' ? '✅' : '❌' }}</text>
+      </view>
+
       <view class="word-container" :class="{ 'floating': isFloating }" v-if="!showCrosshair">
         <text 
           class="stimulus-word" 
@@ -57,7 +63,7 @@
     </view>
 
     <!-- Controls -->
-    <view class="controls-area" v-if="!showCrosshair">
+    <view class="controls-area">
       <view 
         v-for="(btn, index) in currentButtons"
         :key="index"
@@ -78,7 +84,7 @@
 
     <!-- Footer -->
     <view class="footer">
-      <text class="session-info">CURRENT SESSION {{ String(currentRound).padStart(2, '0') }} / {{ maxRounds }}</text>
+      <text class="session-info">{{ modeLabel }} {{ String(currentRound).padStart(2, '0') }} / {{ String(displayTotalRounds).padStart(2, '0') }}</text>
       <view class="pagination">
         <view 
           v-for="n in 5" 
@@ -89,19 +95,33 @@
       </view>
     </view>
     
-    <!-- Countdown Overlay -->
-    <CountdownOverlay 
-      v-if="showCountdown" 
-      @complete="handleCountdownComplete" 
+    <view v-if="showPracticeTransition" class="transition-overlay">
+      <view class="transition-card">
+        <text class="t-title">练习完成</text>
+        <view class="t-actions">
+          <view class="t-btn" @click="startFormalTest">
+            <text>进入正式测试</text>
+          </view>
+          <view class="t-btn t-btn-secondary" @click="continuePracticeMode">
+            <text>继续练习模式</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <CountdownOverlay
+      v-if="showCountdown"
+      :seconds="3"
+      @complete="handlePracticeCountdownComplete"
     />
   </view>
 </template>
 
 <script>
-import CountdownOverlay from '@/components/CountdownOverlay.vue';
 import { getNormsByAge } from '@/utils/testConfigManager.js';
 import mod03Config from '@/data/config_mod03.json';
 import mod04Config from '@/data/config_mod04.json';
+import CountdownOverlay from '@/components/CountdownOverlay.vue';
 
 export default {
   components: {
@@ -109,7 +129,6 @@ export default {
   },
   data() {
     return {
-      showCountdown: true,
       statusBarHeight: 20,
       menuButtonTop: 24, 
       menuButtonHeight: 32, 
@@ -126,9 +145,10 @@ export default {
       startTime: 0,
       timer: null, 
       roundTimeout: null, 
+      entryDelayTimer: null,
       
       // Game State
-      currentWordText: '###',
+      currentWordText: '准备',
       currentInkColor: '#00E5FF', 
       currentInkType: 'blue', 
       
@@ -139,9 +159,13 @@ export default {
       
       isFloating: true,
       feedback: null, 
+      isPracticeMode: true,
+      practiceMaxRounds: 5,
+      showPracticeTransition: false,
+      showCountdown: true,
+      practiceFeedback: null,
       
-      // State Machine
-      showCrosshair: false, // State C/D
+      showCrosshair: false,
       
       // Anti-desensitization history
       recentWords: [],
@@ -161,10 +185,19 @@ export default {
   },
   computed: {
     tickCount() {
-      return Math.min(20, this.maxRounds);
+      return Math.min(20, this.displayTotalRounds);
     },
     progressPercent() {
-      return (this.currentRound / this.maxRounds) * 100;
+      return (this.currentRound / this.displayTotalRounds) * 100;
+    },
+    displayTotalRounds() {
+      return this.isPracticeMode ? this.practiceMaxRounds : this.maxRounds;
+    },
+    modeLabel() {
+      return this.isPracticeMode ? '练习' : '正式';
+    },
+    protocolLabel() {
+      return this.isPracticeMode ? 'PRACTICE_PROTOCOL' : 'EMOTIONAL_PROTOCOL';
     }
   },
   onLoad(options) {
@@ -228,16 +261,30 @@ export default {
     if (this.customWords.length === 0) this.customWords = ["焦虑", "紧张", "害怕"];
     if (this.neutralWords.length === 0) this.neutralWords = ["桌子", "椅子", "电脑"];
 
-    this.generateRoundData();
+    console.log('[EmotionalStroop] 页面已进入，显示3秒倒计时蒙版');
+    this.startPracticeCountdown('页面进入');
   },
   onUnload() {
+    if (this.entryDelayTimer) clearTimeout(this.entryDelayTimer);
     this.stopTimer();
   },
   methods: {
     goBack() {
       uni.navigateBack();
     },
-    handleCountdownComplete() {
+    startPracticeCountdown(source) {
+      console.log(`[EmotionalStroop] 触发练习倒计时，来源=${source}`);
+      if (this.entryDelayTimer) {
+        clearTimeout(this.entryDelayTimer);
+        this.entryDelayTimer = null;
+      }
+      this.stopTimer();
+      this.showCrosshair = false;
+      this.showPracticeTransition = false;
+      this.showCountdown = true;
+    },
+    handlePracticeCountdownComplete() {
+      console.log('[EmotionalStroop] 3秒倒计时结束，启动练习模式');
       this.showCountdown = false;
       this.startGame();
     },
@@ -246,6 +293,10 @@ export default {
       this.score = 0;
       this.errors = 0;
       this.reactionTimes = [];
+      this.showPracticeTransition = false;
+      this.practiceFeedback = null;
+      this.showCrosshair = false;
+      console.log('[EmotionalStroop] 游戏启动');
       this.startTime = Date.now(); 
       this.nextRound();
     },
@@ -263,20 +314,32 @@ export default {
 
     handleTimeout() {
       this.stopTimer();
+      console.log('[EmotionalStroop] 超时触发');
+      if (this.isPracticeMode) {
+        this.practiceFeedback = 'wrong';
+        uni.vibrateShort();
+        setTimeout(() => {
+          this.practiceFeedback = null;
+          if (this.currentRound >= this.practiceMaxRounds) {
+            this.finishPractice();
+          } else {
+            this.currentRound++;
+            this.nextRound();
+          }
+        }, 800);
+        return;
+      }
       this.errors++;
       this.feedback = 'wrong';
-      uni.vibrateShort();
       
-      // Timeout also triggers Cooling Phase
       this.triggerCooling();
     },
     
     triggerCooling() {
-      // State C & D: Show Crosshair and wait 1200ms
+      console.log('[EmotionalStroop] 进入冷却阶段');
       this.showCrosshair = true;
       
       setTimeout(() => {
-        // State E: Next Question
         this.showCrosshair = false;
         this.currentRound++;
         this.nextRound();
@@ -310,7 +373,7 @@ export default {
         this.recentWords.push(candidate);
         if (this.recentWords.length > 5) this.recentWords.shift(); // Maintain buffer
       } else {
-        this.currentWordText = '###';
+        this.currentWordText = '准备';
       }
 
       // 3. Setup Buttons (3 Buttons for consistency)
@@ -328,7 +391,11 @@ export default {
     },
 
     nextRound() {
-      if (this.currentRound > this.maxRounds) {
+      if (this.isPracticeMode && this.currentRound > this.practiceMaxRounds) {
+        this.finishPractice();
+        return;
+      }
+      if (!this.isPracticeMode && this.currentRound > this.maxRounds) {
         this.finishGame();
         return;
       }
@@ -339,16 +406,34 @@ export default {
     },
     
     handleInput(inputType) {
-      if (this.showCountdown) return; 
-      if (this.showCrosshair) return; // Cooling phase blocks input
+      if (this.showCrosshair) return;
+      if (this.showPracticeTransition) return;
+      if (this.showCountdown) return;
       if (this.feedback) return; 
       
+      console.log(`[EmotionalStroop] 用户作答: ${inputType}`);
       this.stopTimer();
 
       const reactionTime = Date.now() - this.roundStartTime;
-      this.reactionTimes.push(reactionTime);
       
       const isCorrect = (inputType === this.currentInkType);
+      if (this.isPracticeMode) {
+        this.practiceFeedback = isCorrect ? 'correct' : 'wrong';
+        if (!isCorrect) {
+          uni.vibrateShort();
+        }
+        setTimeout(() => {
+          this.practiceFeedback = null;
+          if (this.currentRound >= this.practiceMaxRounds) {
+            this.finishPractice();
+          } else {
+            this.currentRound++;
+            this.nextRound();
+          }
+        }, 800);
+        return;
+      }
+      this.reactionTimes.push(reactionTime);
       
       if (isCorrect) {
         this.score++;
@@ -356,10 +441,37 @@ export default {
       } else {
         this.errors++;
         this.feedback = 'wrong';
-        uni.vibrateShort();
       }
       
       this.triggerCooling();
+    },
+    finishPractice() {
+      console.log('[EmotionalStroop] 练习阶段结束');
+      this.stopTimer();
+      this.practiceFeedback = null;
+      this.showCrosshair = false;
+      this.currentRound = 1;
+      this.showPracticeTransition = true;
+    },
+    startFormalTest() {
+      console.log('[EmotionalStroop] 进入正式测试');
+      this.showPracticeTransition = false;
+      this.isPracticeMode = false;
+      this.score = 0;
+      this.errors = 0;
+      this.reactionTimes = [];
+      this.feedback = null;
+      this.practiceFeedback = null;
+      this.showCrosshair = false;
+      this.currentRound = 1;
+      this.recentWords = [];
+      this.startTime = Date.now();
+      this.nextRound();
+    },
+    continuePracticeMode() {
+      console.log('[EmotionalStroop] 继续练习模式');
+      this.isPracticeMode = true;
+      this.startPracticeCountdown('继续练习');
     },
     
     finishGame() {
@@ -605,6 +717,30 @@ page {
   width: 100%;
 }
 
+.feedback-indicator {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 35;
+  pointer-events: none;
+  animation: feedback-pop 0.5s ease-out forwards;
+}
+
+.feedback-icon {
+  font-size: 160rpx;
+  line-height: 1;
+  font-weight: 900;
+}
+
+.feedback-indicator.correct .feedback-icon {
+  text-shadow: 0 0 30rpx rgba(16, 185, 129, 0.75), 0 0 80rpx rgba(16, 185, 129, 0.4);
+}
+
+.feedback-indicator.wrong .feedback-icon {
+  text-shadow: 0 0 30rpx rgba(239, 68, 68, 0.75), 0 0 80rpx rgba(239, 68, 68, 0.4);
+}
+
 .crosshair-container {
   width: 100%;
   height: 100%;
@@ -617,7 +753,7 @@ page {
   font-size: 100rpx;
   color: #ffffff;
   font-weight: 300;
-  transform: translateY(-180rpx);
+  transform: translateY(-120rpx);
 }
 
 .word-container {
@@ -742,5 +878,102 @@ page {
 .dot.active {
   background: #00E5FF;
   box-shadow: 0 0 8rpx #00E5FF;
+}
+
+.transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(2, 11, 28, 0.55);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.transition-card {
+  width: 100%;
+  max-width: 680rpx;
+  border-radius: 24rpx;
+  padding: 48rpx 40rpx;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 11, 28, 0.95));
+  border: 1px solid rgba(34, 211, 238, 0.55);
+  box-shadow: 0 0 40rpx rgba(34, 211, 238, 0.2), inset 0 0 50rpx rgba(34, 211, 238, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.t-title {
+  font-size: 44rpx;
+  font-weight: 800;
+  letter-spacing: 2rpx;
+  color: #e0f2fe;
+  text-align: center;
+}
+
+.t-actions {
+  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.t-btn {
+  width: 420rpx;
+  max-width: 100%;
+  height: 96rpx;
+  border-radius: 14rpx;
+  border: 1px solid rgba(34, 211, 238, 0.9);
+  background: linear-gradient(90deg, rgba(6, 182, 212, 0.35), rgba(14, 116, 144, 0.45));
+  color: #ecfeff;
+  font-size: 30rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 26rpx rgba(34, 211, 238, 0.4);
+  animation: pulse-glow 1.6s ease-in-out infinite;
+}
+
+.t-btn-secondary {
+  background: transparent;
+  color: #e0f2fe;
+  border: 1px solid rgba(34, 211, 238, 0.72);
+  animation: none;
+}
+
+@keyframes feedback-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 20rpx rgba(34, 211, 238, 0.28);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 40rpx rgba(34, 211, 238, 0.58);
+    transform: scale(1.02);
+  }
+  100% {
+    box-shadow: 0 0 20rpx rgba(34, 211, 238, 0.28);
+    transform: scale(1);
+  }
 }
 </style>
